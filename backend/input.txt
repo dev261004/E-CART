@@ -1,0 +1,32 @@
+{
+  "email": "dev@admin.com",
+  "password": "Admin@123"
+}
+ 
+{
+  "email": "buyer1@example.com",
+  "password": "Buyer@123"
+}
+
+{
+  "email": "vendor1@example.com",
+  "password": "Vendor@123"
+}
+
+{
+  "email": "harsh@vendor.com",
+  "password": "vEndor@123" 
+}
+
+{
+  "email": "kirtan@vendor.com",
+  "password": "Vendor@123"
+}
+
+{
+  "name": "Dev Admin",
+  "email": "dev@admin.com",
+  "password": "Admin@123",
+  "phoneNumber": "9123456780",
+  "role": "buyer"
+}
