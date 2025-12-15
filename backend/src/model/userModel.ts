@@ -7,6 +7,7 @@ export interface LinkedDevice {
   authenticatedAt: Date;
   expiresAt: Date;
   accessToken?: string;
+  refreshToken?: string;
 }
 
 export interface IUser {
@@ -20,6 +21,13 @@ export interface IUser {
   createdAt?: Date;
   updatedAt?: Date;
   linkedDevices: LinkedDevice[];
+  profileImage?: string | null;
+  addressLine1?: string | null;
+  addressLine2?: string | null;
+  city?: string | null;
+  state?: string | null;
+  postalCode?: string | null;
+  country?: string | null;
 }
 
 const linkedDeviceSchema = new Schema<LinkedDevice>(
@@ -33,6 +41,7 @@ const linkedDeviceSchema = new Schema<LinkedDevice>(
       index: { expireAfterSeconds: 0 }, // TTL
     },
     accessToken: { type: String, default: null },
+    refreshToken: { type: String, default: null },
   },
   { _id: false }
 );
@@ -53,6 +62,14 @@ const userSchema = new Schema<UserDocument>(
     phoneNumber: { type: String, required: true },
     role: { type: String, enum: ["admin", "vendor", "buyer"], required: true },
     refreshToken: { type: String, default: null },
+    profileImage: { type: String, default: null },
+
+    addressLine1: { type: String, default: null, trim: true },
+    addressLine2: { type: String, default: null, trim: true },
+    city:        { type: String, default: null, trim: true },
+    state:       { type: String, default: null, trim: true },
+    postalCode:  { type: String, default: null, trim: true },
+    country:     { type: String, default: null, trim: true },
     linkedDevices: { type: [linkedDeviceSchema], default: [] },
   },
   { timestamps: true }

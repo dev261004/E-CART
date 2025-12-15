@@ -3,7 +3,7 @@ import bcrypt from 'bcrypt';
 import User, { UserDocument } from '../../model/userModel';
 import messages from '../../utils/messages';
 import AppError from "../../utils/AppError";
-import { IUserSignup } from '../../utils/typeAliases';
+import { IUserSignup,UpdateProfilePayload,UpdateProfileResult } from '../../utils/typeAliases';
 import mongoose from "mongoose"
 
 //Create a new user (vendor or buyer)
@@ -61,4 +61,33 @@ export const getUserById = async (id: string): Promise<UserDocument | null> => {
     .exec();
 
   return user;
+};
+
+
+export const updateUserProfile = async (
+  userId: string,
+  payload: UpdateProfilePayload
+): Promise<UpdateProfileResult | null> => {
+  const update: any = {};
+
+  if (payload.name !== undefined) update.name = payload.name;
+  if (payload.phoneNumber !== undefined) update.phoneNumber = payload.phoneNumber;
+  if (payload.profileImage !== undefined) update.profileImage = payload.profileImage;
+
+  if (payload.addressLine1 !== undefined) update.addressLine1 = payload.addressLine1;
+  if (payload.addressLine2 !== undefined) update.addressLine2 = payload.addressLine2;
+  if (payload.city !== undefined) update.city = payload.city;
+  if (payload.state !== undefined) update.state = payload.state;
+  if (payload.postalCode !== undefined) update.postalCode = payload.postalCode;
+  if (payload.country !== undefined) update.country = payload.country;
+
+  const updated = await User.findByIdAndUpdate(
+    userId,
+    { $set: update },
+    { new: true, lean: true }      // 👈 important: lean() = plain object
+  )
+    .select("_id name email phoneNumber role profileImage addressLine1 addressLine2 city state postalCode country")
+    .exec();
+
+  return updated as UpdateProfileResult | null;
 };

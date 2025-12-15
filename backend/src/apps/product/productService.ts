@@ -53,44 +53,51 @@ export const updateProduct = async (
   id: string,
   payload: IProductUpdate
 ): Promise<ProductDocument> => {
-  // Validate product id
   if (!mongoose.isValidObjectId(id)) {
-    throw new AppError(400, messages.ERROR.INVALID_PRODUCT_ID ?? 'Invalid product id', 'id');
+    throw new AppError(400, messages.ERROR.INVALID_PRODUCT_ID, "id");
   }
 
-  // If category provided, ensure it exists
   if (payload.category !== undefined) {
     if (!mongoose.isValidObjectId(payload.category)) {
-      throw new AppError(400, messages.ERROR.INVALID_CATEGORY_ID ?? 'Invalid category id', 'category');
+      throw new AppError(400, messages.ERROR.INVALID_CATEGORY_ID, "category");
     }
-    const cat = await Category.findById(payload.category).select('-createdAt -updatedAt -__v').exec();
-  
+
+    const cat = await Category.findById(payload.category).exec();
     if (!cat) {
-      throw new AppError(404, messages.ERROR.CATEGORY_NOT_FOUND, 'category');
+      throw new AppError(404, messages.ERROR.CATEGORY_NOT_FOUND, "category");
     }
   }
 
-  // Optional: normalize title if present
-  if (payload.title && typeof payload.title === 'string') {
-    payload.title = payload.title.trim();
-  }
-
-  // Perform update with validators enabled
-  const updated = await Product.findByIdAndUpdate(id, { $set: payload }, { new: true, runValidators: true }).select('-createdAt -updatedAt -__v').exec();
+  const updated = await Product.findByIdAndUpdate(
+    id,
+    { $set: payload },
+    { new: true, runValidators: true }
+  )
+    .select("-createdAt -updatedAt -__v")
+    .exec();
 
   if (!updated) {
-    throw new AppError(404, messages.ERROR.PRODUCT_NOT_FOUND, 'id');
+    throw new AppError(404, messages.ERROR.PRODUCT_NOT_FOUND);
   }
 
   return updated;
 };
 
+
 export const getProductById = async (id: string): Promise<ProductDocument | null> => {
   return Product.findOne({ _id: id })
-  .populate('vendor', '-password -refreshToken -createdAt -updatedAt -__v')
-  .populate('category','-description -createdAt -updatedAt -__v')
-  .select('-createdAt -updatedAt -__v')
-  .exec();
+    .populate({
+      path: "vendor",
+      model: User,
+      select: "-password -refreshToken -createdAt -updatedAt -__v",
+    })
+    .populate({
+      path: "category",
+      model: Category,
+      select: "-description -createdAt -updatedAt -__v",
+    })
+    .select("-createdAt -updatedAt -__v")
+    .exec();
   
 };
 

@@ -21,12 +21,13 @@ import {
   listProductsController,
   deleteProductController,
   uploadProductImagesController,
-  createWithImagesController,
+
   listVendorProductsController,
   listProductsByCategoryNamesController,
   listProductsByCategoryIdsController
 } from './productController';
 import  methodNotAllowed  from "../../utils/methodNotFound"
+import { decryptRequestBody } from '../../middleware/decryptRequestBody';
 
 
 const router = Router();
@@ -44,21 +45,13 @@ router
     auth,
     allowRole('vendor'),
     upload.array('images',5),
+     decryptRequestBody,   
     uploadProductImagesController
   )
   .all(methodNotAllowed);
 
 
- //Combined create-with-images endpoint (vendor only)
-router
-  .route('/create-with-images')
-  .post(
-    auth,
-    allowRole('vendor'),
-    upload.array('images', 5),
-    createWithImagesController
-  )
-  .all(methodNotAllowed);
+
 
 
  // Vendor's own products

@@ -43,7 +43,7 @@ router
   .post(validate(resetPasswordValidation, "body"), resetPasswordController)
   .all(methodNotAllowed);
 
-router.get("/session-status", auth, sessionStatusController);
+router.get("/session-status",auth, sessionStatusController);
 router
   .route("/change-password")
   .post(

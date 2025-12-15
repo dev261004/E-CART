@@ -1,21 +1,33 @@
 // src/server.ts
 import 'dotenv/config';
 import express,{ Request, Response, NextFunction } from 'express';
+import bodyParser from "body-parser";
 import mongoose from 'mongoose';
 import morgan from 'morgan';
 import cookieParser from 'cookie-parser';
-import routes from './routes/index';        
+import routes from './routes/index';      
+import { decryptRequestBody } from "./middleware/decryptRequestBody";
+import cryptoRoutes from "./routes/cryptoRoutes";
+import testRoutes from "./routes/testRoutes";
 import multer from 'multer';
 import cors from 'cors';
 const app = express();
 
 // Middlewares
-app.use(cors({ origin:'http://localhost:5173',credentials: true }));
+app.use(cors({ origin:['http://localhost:5173','http://192.168.1.243:5173'],credentials: true }));
 
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(morgan('dev')); // simple logging
 app.use(cookieParser());
+// parse JSON
+app.use(bodyParser.json());
+
+app.use("/crypto", cryptoRoutes);
+app.use("/test", testRoutes);
+// decrypt encrypted request bodies if req.body.data exists
+app.use(decryptRequestBody);
+
 
 // Routes
 app.use('/api', routes);

@@ -28,12 +28,16 @@ const messages = {
   },
 
   ERROR: {
+
+    ENCRYPTIION_KEY_LENGTH_INVALID:"ENCRYPTION_KEY must be 32 bytes (64 hex chars) for aes-256-cbc",
+    ENCRYPTIION_IV_LENGTH_INVALID:"ENCRYPTION_IV must be 16 bytes (32 hex chars) for aes-256-cbc",
+    ENCRYPTION_ENV_VARS_MISSING:"ENCRYPTION_KEY or ENCRYPTION_IV missing in .env",
     REQUIRED_FIELDS: "Please fill all required fields",
     INVALID_EMAIL: "Email format is invalid",
     EMAIL_EXISTS: "Email already exists",
     INVALID_CREDENTIALS: "Invalid email or password",
     USER_NOT_FOUND: "User not exists with this email check email",
-  INVALID_OLD_PASSWORD: "Current password is incorrect",
+     INVALID_OLD_PASSWORD: "Current password is incorrect",
     PASSWORD_SAME_AS_OLD: "New password must be different from current password",
      
     OTP_REQUIRED: "OTP is required",

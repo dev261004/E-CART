@@ -30,14 +30,14 @@ export const createCategoryController = async (
 
     const category = await createCategory(payload);
 
-    return createResponse(res, 201, messages.SUCCESS.CATEGORY_CREATED, category);
+    return await createResponse(res, 201, messages.SUCCESS.CATEGORY_CREATED, category,true);
 
   } catch (err: any) {
     if (err instanceof AppError) {
-      return createResponse(res, err.status, err.message);
+      return await createResponse(res, err.status, err.message,undefined,false);
     }
 
-    return createResponse(res, 400, err.message || messages.ERROR.SERVER_ERROR);
+    return await createResponse(res, 400, err.message || messages.ERROR.SERVER_ERROR,undefined,false);
   }
 };
 
@@ -52,15 +52,15 @@ export const updateCategoryController = async (
 
     const updated = await updateCategory(id, payload);
 
-    return createResponse(res, 200, messages.SUCCESS.CATEGORY_UPDATED, updated);
+    return await createResponse(res, 200, messages.SUCCESS.CATEGORY_UPDATED, updated,true);
   } catch (err: any) {
     if (err instanceof AppError) {
       // AppError contains proper status and message
-      return createResponse(res, err.status, err.message);
+      return await createResponse(res, err.status, err.message,undefined,false);
     }
     // unexpected
     console.error('updateCategoryController error:', err);
-    return createResponse(res, 500, err.message || messages.ERROR.SERVER_ERROR);
+    return await createResponse(res, 500, err.message || messages.ERROR.SERVER_ERROR,undefined,false);
   }
 };
 
@@ -77,13 +77,13 @@ export const getCategoryController = async (
       throw new AppError(404, messages.ERROR.CATEGORY_NOT_FOUND);
     }
 
-    return createResponse(res, 200, messages.SUCCESS.CATEGORY_FETCHED, category);
+    return await createResponse(res, 200, messages.SUCCESS.CATEGORY_FETCHED, category,true);
   } catch (err: any) {
     if (err instanceof AppError) {
-      return createResponse(res, err.status, err.message);
+      return await createResponse(res, err.status, err.message,undefined,false);
     }
     console.error('getCategoryController error:', err);
-    return createResponse(res, 500, err.message || messages.ERROR.SERVER_ERROR);
+    return await createResponse(res, 500, err.message || messages.ERROR.SERVER_ERROR,undefined,false);
   }
 };
 
@@ -102,13 +102,13 @@ export const listCategoriesController = async (
 
     const result = await listCategories(q);
 
-    return createResponse(res, 200, messages.SUCCESS.CATEGORY_LIST, result);
+    return await createResponse(res, 200, messages.SUCCESS.CATEGORY_LIST, result,true);
   } catch (err: any) {
     if (err instanceof AppError) {
-      return createResponse(res, err.status, err.message);
+      return await createResponse(res, err.status, err.message,undefined,false);
     }
     console.error('listCategoriesController error:', err);
-    return createResponse(res, 500, err.message || messages.ERROR.SERVER_ERROR);
+    return await createResponse(res, 500, err.message || messages.ERROR.SERVER_ERROR,undefined,false);
   }
 };
 
@@ -127,13 +127,13 @@ export const setCategoryActiveController = async (
       throw new AppError(404, messages.ERROR.CATEGORY_NOT_FOUND);
     }
 
-    return createResponse(res, 200, messages.SUCCESS.CATEGORY_UPDATED, updated);
+    return await createResponse(res, 200, messages.SUCCESS.CATEGORY_UPDATED, updated,true);
   } catch (err: any) {
     if (err instanceof AppError) {
-      return createResponse(res, err.status, err.message);
+      return await createResponse(res, err.status, err.message,undefined,false);
     }
     console.error('setCategoryActiveController error:', err);
-    return createResponse(res, 500, err.message || messages.ERROR.SERVER_ERROR);
+    return await createResponse(res, 500, err.message || messages.ERROR.SERVER_ERROR,undefined,false);
   }
 };
 
@@ -149,13 +149,13 @@ export const deleteCategoryController = async (
       throw new AppError(404, messages.ERROR.CATEGORY_NOT_FOUND);
     }
 
-    return createResponse(res, 200, messages.SUCCESS.CATEGORY_DELETED);
+    return await createResponse(res, 200, messages.SUCCESS.CATEGORY_DELETED,undefined,false);
   } catch (err: any) {
     if (err instanceof AppError) {
-      return createResponse(res, err.status, err.message);
+      return await createResponse(res, err.status, err.message,undefined,false);
     }
     console.error('deleteCategoryController error:', err);
-    return createResponse(res, 500, err.message || messages.ERROR.SERVER_ERROR);
+    return await createResponse(res, 500, err.message || messages.ERROR.SERVER_ERROR,undefined,false);
   }
 };
 

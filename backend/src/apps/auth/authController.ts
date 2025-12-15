@@ -18,14 +18,15 @@ import {
 
 
 
+
 export const refreshTokenController = async (
   req: Request,
   res: Response<ApiResponse>
 ) => {
   try {
     const refreshToken =
-      (req.cookies && (req.cookies.refreshToken as string)) ||
-      (req.body && req.body.refreshToken);
+      req.cookies?.refreshToken ||
+      req.body?.refreshToken;
 
     if (!refreshToken) {
       throw new AppError(401, messages.ERROR.UNAUTHORIZED);
@@ -33,16 +34,21 @@ export const refreshTokenController = async (
 
     let payload;
     try {
-      payload = verifyRefreshToken(refreshToken); // { userId, role, sessionId, type }
+      payload = verifyRefreshToken(refreshToken);
+      if (payload.type && payload.type !== "refresh") {
+        throw new AppError(401, messages.ERROR.INVALID_TOKEN);
+      }
     } catch {
       throw new AppError(401, messages.ERROR.INVALID_TOKEN);
     }
 
     const { userId, role, sessionId } = payload;
 
+    // 🔐 Validate refresh token against linkedDevices
     const user = await User.findOne({
       _id: userId,
       "linkedDevices.sessionId": sessionId,
+      "linkedDevices.refreshToken": refreshToken,
       "linkedDevices.authenticated": true
     }).exec();
 
@@ -50,33 +56,47 @@ export const refreshTokenController = async (
       throw new AppError(401, messages.ERROR.INVALID_TOKEN);
     }
 
-    const newAccessToken = generateAccessToken(userId, role as TRole, sessionId);
-    const newRefreshToken = generateRefreshToken(userId, role as TRole, sessionId);
+    // ✅ OPTION A: ONLY generate new access token
+    const newAccessToken = generateAccessToken(
+      userId,
+      role as TRole,
+      sessionId
+    );
 
-    const device = user.linkedDevices.find((d) => d.sessionId === sessionId);
-    if (device) {
-      device.accessToken = newAccessToken;
-    }
-    user.refreshToken = newRefreshToken;
-    await user.save();
-    res.cookie("refreshToken", newRefreshToken, {
-      httpOnly: true,
-      sameSite: "strict",
-      path: "/",
-      maxAge: 7 * 24 * 60 * 60 * 1000,
-    });
-    return createResponse(res, 200, "Tokens refreshed", {
-      accessToken: newAccessToken,
-      refreshToken: newRefreshToken
-    });
+    // ❌ NO refresh token rotation
+    // ❌ NO cookie reset
+    // ❌ NO DB update required
+
+    return await createResponse(
+      res,
+      200,
+      "Access token refreshed",
+      { accessToken: newAccessToken },
+      false
+    );
   } catch (err: any) {
     if (err instanceof AppError) {
-      return createResponse(res, err.status, err.message);
+      return await createResponse(
+        res,
+        err.status,
+        err.message,
+        undefined,
+        false
+      );
     }
+
     console.error("refreshTokenController error:", err);
-    return createResponse(res, 500, err.message || messages.ERROR.SERVER_ERROR);
+    return await createResponse(
+      res,
+      500,
+      err.message || messages.ERROR.SERVER_ERROR,
+      undefined,
+      false
+    );
   }
 };
+
+
 
 // POST /api/auth/forgot-password
 export const forgotPasswordController = async (
@@ -87,42 +107,52 @@ export const forgotPasswordController = async (
     const payload = req.body;
     const { resetToken } = await requestPasswordReset(payload);
 
-    return createResponse(res, 200, messages.SUCCESS.OTP_SENT, {
-      resetToken, 
-    });
+    return await createResponse(res, 200, messages.SUCCESS.OTP_SENT, {
+      resetToken,
+    }, true);
   } catch (err: any) {
     if (err instanceof AppError) {
-      return createResponse(res, err.status, err.message);
+      return await createResponse(res, err.status, err.message, undefined, false);
     }
     console.error("forgotPasswordController error:", err);
-    return createResponse(res, 500, err.message || messages.ERROR.SERVER_ERROR);
+    return await createResponse(res, 500, err.message || messages.ERROR.SERVER_ERROR, undefined, false);
   }
 };
 
 
+// POST /api/auth/reset-password
 // POST /api/auth/reset-password
 export const resetPasswordController = async (
   req: Request<{}, ApiResponse, IResetPasswordRequest>,
   res: Response<ApiResponse>
 ) => {
   try {
-    const payload = req.body;
+    const payload = req.body; // decrypted by decryptRequestBody if client sent { data: "<hex>" }
     await resetPasswordWithOtp(payload);
 
-    return createResponse(
+    // No payload to encrypt (only message). Keep encryption = false for clarity/debug.
+    return await createResponse(
       res,
       200,
-      messages.SUCCESS.PASSWORD_RESET_SUCCESS
+      messages.SUCCESS.PASSWORD_RESET_SUCCESS,
+      undefined,
+      false
     );
   } catch (err: any) {
     if (err instanceof AppError) {
-      return createResponse(res, err.status, err.message);
+      // send error as plain JSON (debug-friendly)
+      return await createResponse(res, err.status, err.message, undefined, false);
     }
     console.error("resetPasswordController error:", err);
-    return createResponse(res, 500, err.message || messages.ERROR.SERVER_ERROR);
+    return await createResponse(
+      res,
+      500,
+      err.message || messages.ERROR.SERVER_ERROR,
+      undefined,
+      false
+    );
   }
 };
-
 
 export const resendOtpController = async (
   req: Request<{}, ApiResponse, IForgotPasswordRequest>,
@@ -132,23 +162,23 @@ export const resendOtpController = async (
     const payload = req.body; // { email }
 
     // Re-use the same service used by forgot-password
-  const { resetToken } = await requestPasswordReset(payload);
+    const { resetToken } = await requestPasswordReset(payload);
 
-    return createResponse(
+    return await createResponse(
       res,
       200,
       messages.SUCCESS.OTP_RESENT ?? messages.SUCCESS.OTP_SENT,
-      { resetToken }
+      { resetToken },
+      true
     );
   } catch (err: any) {
     if (err instanceof AppError) {
-      return createResponse(res, err.status, err.message);
+      return await createResponse(res, err.status, err.message, undefined, false);
     }
     console.error("resendOtpController error:", err);
-    return createResponse(res, 500, err.message || messages.ERROR.SERVER_ERROR);
+    return await createResponse(res, 500, err.message || messages.ERROR.SERVER_ERROR, undefined, false);
   }
 };
-
 
 export const changePasswordController = async (
   req: Request<{}, ApiResponse, IChangePasswordRequest>,
@@ -172,15 +202,28 @@ export const changePasswordController = async (
       throw new AppError(404, messages.ERROR.USER_NOT_FOUND);
     }
 
+    console.log("BEFORE filter", {
+      currentSessionId,
+      linkedDevices: user.linkedDevices.map(d => d.sessionId),
+    });
     // 3) Keep ONLY this session
     user.linkedDevices = user.linkedDevices.filter(
       (d) => d.sessionId === currentSessionId
     );
     await user.save();
 
+    //console.log("AFTER filter", user.linkedDevices.map(d => d.sessionId));
+
     // 4) Issue fresh tokens (same currentSessionId)
     const accessToken = generateAccessToken(userId, user.role, currentSessionId);
     const refreshToken = generateRefreshToken(userId, user.role, currentSessionId);
+
+    const device = user.linkedDevices.find(
+      (d) => d.sessionId === currentSessionId
+    );
+    if (device) {
+      device.accessToken = accessToken;
+    }
 
     user.refreshToken = refreshToken;
     await user.save();
@@ -193,19 +236,21 @@ export const changePasswordController = async (
       maxAge: 7 * 24 * 60 * 60 * 1000,
     });
 
-    return createResponse(res, 200, messages.SUCCESS.PASSWORD_CHANGED, {
+    return await createResponse(res, 200, messages.SUCCESS.PASSWORD_CHANGED, {
       accessToken,
       refreshToken,
-    });
+    }, true);
   } catch (err: any) {
     if (err instanceof AppError) {
-      return createResponse(res, err.status, err.message);
+      return await createResponse(res, err.status, err.message, undefined, false);
     }
     console.error("changePasswordController error:", err);
-    return createResponse(res, 500, err.message || messages.ERROR.SERVER_ERROR);
+    return await createResponse(res, 500, err.message || messages.ERROR.SERVER_ERROR, undefined, false);
   }
 };
 
+// src/controllers/authController.ts
+// GET /api/auth/session-status
 // src/controllers/authController.ts
 export const sessionStatusController = (
   req: Request,
@@ -222,4 +267,4 @@ export const sessionStatusController = (
       role: user.role,
     },
   });
-};
+}; 

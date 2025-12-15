@@ -90,6 +90,39 @@ export const userIdParamValidation = Joi.object({
 });
 
 
+export const updateProfileValidation = Joi.object({
+  name: Joi.string()
+    .pattern(namePattern)
+    .trim()
+    .optional()
+    .messages({
+      "string.base": messages.ERROR.INVALID_FIELD_TYPE,
+      "string.min":  "Name is too short",
+      "string.max": "Name is too long",
+    }),
+
+  phoneNumber: Joi.string()
+    .pattern(/^[0-9]{10}$/)
+    .optional()
+    .messages({
+      "string.base": messages.ERROR.INVALID_FIELD_TYPE,
+      "string.pattern.base":
+        "Phone must be 10 digits",
+    }),
+
+  addressLine1: Joi.string().max(200).allow("", null).optional(),
+  addressLine2: Joi.string().max(200).allow("", null).optional(),
+  city: Joi.string().max(100).allow("", null).optional(),
+  state: Joi.string().max(100).allow("", null).optional(),
+  postalCode: Joi.string().max(6).allow("", null).optional(),
+  country: Joi.string().max(100).allow("", null).optional(),
+  removeAvatar: Joi.boolean()
+    .truthy("true")
+    .falsy("false")
+    .optional(),
+  // we do NOT validate profileImage here, it comes from file upload
+}).min(1); // at least one field must be present
+
 
 
 

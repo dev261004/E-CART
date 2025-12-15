@@ -60,8 +60,8 @@ export const requestPasswordReset = async (payload: IForgotPasswordRequest) => {
 export const resetPasswordWithOtp = async (payload: IResetPasswordRequest) => {
   const { email, otp, newPassword, resetToken } = payload;
 
-  console.log("Reset payload received:", payload);      // 👈 add this
-  console.log("Reset token received:", resetToken);     
+  //console.log("Reset payload received:", payload);      // 👈 add this
+ //console.log("Reset token received:", resetToken);     
   const user = await User.findOne({ email }).exec();
   if (!user) {
     throw new AppError(404, messages.ERROR.USER_NOT_FOUND, "email");

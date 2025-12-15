@@ -50,17 +50,18 @@ const auth = async (req: Request, res: Response, next: NextFunction) => {
       });
     }
 
-    const device = user.linkedDevices.find(
-      (d) => d.sessionId === decoded.sessionId
-    );
+    
+    // const device = user.linkedDevices.find(
+    //   (d) => d.sessionId === decoded.sessionId
+    // );
 
-    if (device?.accessToken && device.accessToken !== token) {
-      // someone is using an old/rotated token
-      return res.status(401).json({
-        success: false,
-        message: messages.ERROR.INVALID_TOKEN
-      });
-    }
+    // if (device?.accessToken && device.accessToken !== token) {
+    //   // someone is using an old/rotated token
+    //   return res.status(401).json({
+    //     success: false,
+    //     message: messages.ERROR.INVALID_TOKEN
+    //   });
+    // }
     
     req.user = {
       userId: decoded.userId,

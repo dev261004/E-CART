@@ -17,13 +17,13 @@ import {
   IProductUpdate,
   IProductQuery
 } from '../../utils/typeAliases';
-import {createProductValidation} from './productValidation';
+import { createProductValidation } from './productValidation';
 import { uploadMultipleToCloudinary } from "../../services/cloudinaryService";
 import AppError from "../../utils/AppError";
 import createResponse from "../../utils/createResponse";
 import { ProductDocument } from '../../model/productModel';
 
-
+import Product from "../../model/productModel";
 const getVendorIdFromProduct = (vendor: any): string => {
   if (!vendor) return '';
   // if not populated, vendor is ObjectId or string
@@ -50,13 +50,13 @@ export const createProductController = async (
 
     const product = await createProduct(payload);
 
-    return createResponse(res, 201, messages.SUCCESS.PRODUCT_CREATED, product);
+    return await createResponse(res, 201, messages.SUCCESS.PRODUCT_CREATED, product, true);
   } catch (err: any) {
     if (err instanceof AppError) {
-      return createResponse(res, err.status, err.message);
+      return await createResponse(res, err.status, err.message, undefined, false);
     }
     console.error('createProductController error:', err);
-    return createResponse(res, 500, err.message || messages.ERROR.SERVER_ERROR);
+    return await createResponse(res, 500, err.message || messages.ERROR.SERVER_ERROR, undefined, false);
   }
 };
 
@@ -74,32 +74,83 @@ export const updateProductController = async (
       throw new AppError(401, messages.ERROR.UNAUTHORIZED);
     }
 
-    // ensure product exists
+    // 1️⃣ ensure product exists
     const product = await getProductById(id);
     if (!product) {
       throw new AppError(404, messages.ERROR.PRODUCT_NOT_FOUND);
     }
 
-    // ownership check
+    // 2️⃣ ownership check
     const productVendorId = getVendorIdFromProduct(product.vendor);
     if (productVendorId !== user.userId) {
       throw new AppError(403, messages.ERROR.FORBIDDEN);
     }
 
-    const updated = await updateProduct(id, payload);
-    if (!updated) {
-      throw new AppError(404, messages.ERROR.PRODUCT_NOT_FOUND);
+    /* ----------------------------------
+       IMAGE REMOVAL ONLY (NO UPLOAD HERE)
+    ---------------------------------- */
+
+    // ✅ IMAGE MERGE LOGIC (remove + add)
+    let finalImages = [...(product.images ?? [])];
+
+    // 1️⃣ remove images
+    if (payload.removeImages) {
+      const removeList = Array.isArray(payload.removeImages)
+        ? payload.removeImages
+        : [payload.removeImages];
+
+      finalImages = finalImages.filter(
+        (img) => !removeList.includes(img)
+      );
     }
 
-    return createResponse(res, 200, messages.SUCCESS.PRODUCT_UPDATED, updated);
+    // 2️⃣ add new images (from frontend payload.images)
+    if (Array.isArray(payload.images) && payload.images.length > 0) {
+      finalImages.push(...payload.images);
+    }
+
+    // 3️⃣ assign back
+    payload.images = finalImages;
+console.log("FINAL IMAGES:", payload.images);
+
+    // cleanup
+    delete payload.removeImages;
+
+    // 3️⃣ normalize title if provided
+    if (payload.title && typeof payload.title === "string") {
+      payload.title = payload.title.trim();
+    }
+
+    const updated = await updateProduct(id, payload);
+
+    return await createResponse(
+      res,
+      200,
+      messages.SUCCESS.PRODUCT_UPDATED,
+      updated,
+      true
+    );
   } catch (err: any) {
     if (err instanceof AppError) {
-      return createResponse(res, err.status, err.message);
+      return await createResponse(
+        res,
+        err.status,
+        err.message,
+        undefined,
+        false
+      );
     }
-    console.error('updateProductController error:', err);
-    return createResponse(res, 500, err.message || messages.ERROR.SERVER_ERROR);
+    console.error("updateProductController error:", err);
+    return await createResponse(
+      res,
+      500,
+      err.message || messages.ERROR.SERVER_ERROR,
+      undefined,
+      false
+    );
   }
 };
+
 
 // Public (buyers and guests) can view product details
 export const getProductController = async (
@@ -108,9 +159,11 @@ export const getProductController = async (
 ) => {
   try {
     const { id } = req.params;
-
+    // const raw = await Product.findById(id).select("vendor").lean();
+    // console.log("RAW product vendor from DB:", raw);
     const product = await getProductById(id);
 
+    // console.log('Product vendor field:', product?.vendor);
     if (!product) {
       throw new AppError(404, messages.ERROR.PRODUCT_NOT_FOUND);
     }
@@ -121,15 +174,15 @@ export const getProductController = async (
         ? messages.SUCCESS.PRODUCT_CREATED.replace('created', 'fetched')
         : "Product fetched");
 
-    return createResponse(res, 200, successMessage, product);
+    return await createResponse(res, 200, successMessage, product, true);
 
   } catch (err: any) {
     if (err instanceof AppError) {
-      return createResponse(res, err.status, err.message);
+      return await createResponse(res, err.status, err.message, undefined, false);
     }
 
     console.error("getProductController error:", err);
-    return createResponse(res, 500, err.message || messages.ERROR.SERVER_ERROR);
+    return await createResponse(res, 500, err.message || messages.ERROR.SERVER_ERROR, undefined, false);
   }
 };
 
@@ -148,13 +201,13 @@ export const listProductsController = async (
       (messages.SUCCESS as any).PRODUCT_LIST ??
       (messages.SUCCESS.CATEGORY_LIST ? messages.SUCCESS.CATEGORY_LIST.replace('Categories', 'Products') : 'Products fetched');
 
-    return createResponse(res, 200, successMessage, result);
+    return await createResponse(res, 200, successMessage, result, true);
   } catch (err: any) {
     if (err instanceof AppError) {
-      return createResponse(res, err.status, err.message);
+      return await createResponse(res, err.status, err.message, undefined, false);
     }
     console.error('listProductsController error:', err);
-    return createResponse(res, 500, err.message || messages.ERROR.SERVER_ERROR);
+    return await createResponse(res, 500, err.message || messages.ERROR.SERVER_ERROR, undefined, false);
   }
 };
 
@@ -183,117 +236,49 @@ export const deleteProductController = async (
 
     await deleteProduct(id);
 
-    return createResponse(res, 200, messages.SUCCESS.PRODUCT_DELETED);
+    return await createResponse(res, 200, messages.SUCCESS.PRODUCT_DELETED);
   } catch (err: any) {
     if (err instanceof AppError) {
-      return createResponse(res, err.status, err.message);
+      return await createResponse(res, err.status, err.message);
     }
     console.error('deleteProductController error:', err);
-    return createResponse(res, 500, err.message || messages.ERROR.SERVER_ERROR);
+    return await createResponse(res, 500, err.message || messages.ERROR.SERVER_ERROR);
   }
 };
 
 export const uploadProductImagesController = async (req: any, res: any) => {
   try {
-    // Auth middleware should have run — double-check user
+    // auth middleware should have populated req.user
     const user = req.user;
     if (!user) {
       throw new AppError(401, messages.ERROR.UNAUTHORIZED);
     }
 
-    const files = req.files as Express.Multer.File[] | undefined;
+    // Multer populates req.files (array) when upload.array(...) or specific fields used
+    const files = (req.files as Express.Multer.File[] | undefined) || (req.file ? [req.file] : undefined);
 
     if (!files || files.length === 0) {
-      throw new AppError(400, 'No images provided');
+      throw new AppError(400, "No images provided");
     }
 
-    
-    // uploadMultipleToCloudinary should return an array of results with `secure_url`
-    const results = await uploadMultipleToCloudinary(files, 'products');
+    // Upload images to Cloudinary (or S3) - ensure this function accepts array of buffers/files
+    const results = await uploadMultipleToCloudinary(files, "products");
 
-    const secureUrls = (results || []).map((r: any) => r.secure_url).filter(Boolean);
+    const secureUrls = (results || [])
+      .map((r: any) => r?.secure_url)
+      .filter(Boolean);
 
-    return createResponse(res, 200, 'Images uploaded', { urls: secureUrls });
+    // Respond with encrypted payload (urls) — createResponse will encrypt the data
+    return await createResponse(res, 200, "Images uploaded", { urls: secureUrls }, true);
   } catch (err: any) {
     if (err instanceof AppError) {
-      return createResponse(res, err.status, err.message);
+      // For errors keep encryption=false so it's easy to debug
+      return await createResponse(res, err.status, err.message, undefined, false);
     }
-    console.error('uploadProductImagesController error:', err);
-    return createResponse(res, 500, err.message || messages.ERROR.SERVER_ERROR);
+    console.error("uploadProductImagesController error:", err);
+    return await createResponse(res, 500, err.message || messages.ERROR.SERVER_ERROR, undefined, false);
   }
 };
-
-// src/apps/product/productController.ts 
-export const createWithImagesController = async (
-  req: Request,
-  res: Response<ApiResponse>
-) => {
-  try {
-    const user = req.user;
-    if (!user) {
-      throw new AppError(401, messages.ERROR.UNAUTHORIZED);
-    }
-
-    const files = req.files as Express.Multer.File[] | undefined;
-
-    // 1) Upload to Cloudinary (if files present)
-    let imageUrls: string[] = [];
-    let uploadedResults: any[] = [];
-    if (files && files.length > 0) {
-      uploadedResults = await uploadMultipleToCloudinary(files, `products/${user.userId}`);
-      imageUrls = uploadedResults.map((r: any) => r.secure_url).filter(Boolean);
-    }
-
-    // 2) Build payload (multipart body fields are strings)
-    const raw = req.body || {};
-    const payloadCandidate: any = {
-      vendor: user.userId,
-      title: raw.title,
-      description: raw.description ?? '',
-      price: raw.price !== undefined ? Number(raw.price) : undefined,
-      category: raw.category,
-      images: imageUrls,
-      stock: raw.stock !== undefined ? Number(raw.stock) : undefined,
-      isActive:
-        raw.isActive !== undefined
-          ? raw.isActive === 'true' || raw.isActive === '1'
-          : undefined
-    };
-
-    // 3) Validate with Joi (allow conversion)
-    const { error, value } = createProductValidation.validate(payloadCandidate, {
-      abortEarly: true,
-      stripUnknown: true,
-      convert: true
-    });
-
-    if (error) {
-      // OPTIONAL: cleanup uploaded images to avoid orphans.
-      // e.g. await deleteFromCloudinary(uploadedResults.map(r => r.public_id));
-      throw new AppError(400, error.details?.[0]?.message || messages.ERROR.REQUIRED_FIELDS);
-    }
-
-    // Ensure vendor is the authenticated user and images list is set
-    const finalPayload = value as IProductCreate;
-    finalPayload.vendor = user.userId;
-    finalPayload.images = imageUrls;
-
-    // 4) Create product
-    const product = await createProduct(finalPayload);
-
-    return createResponse(res, 201, messages.SUCCESS.PRODUCT_CREATED, product);
-  } catch (err: any) {
-    if (err instanceof AppError) {
-      return createResponse(res, err.status, err.message);
-    }
-    console.error('createWithImagesController error:', err);
-    return createResponse(res, 500, err.message || messages.ERROR.SERVER_ERROR);
-  }
-};
-
-// GET /api/product/my-products  (vendor only)
-
-// simple helper to parse boolean-ish values
 
 
 export const listVendorProductsController = async (
@@ -307,11 +292,11 @@ export const listVendorProductsController = async (
     const q = req.query as IProductQuery;
     const result = await listProductsByVendor(user.userId, q);
 
-    return createResponse(res, 200, messages.SUCCESS.PRODUCT_LIST ?? 'Products fetched successfully', result);
+    return await createResponse(res, 200, messages.SUCCESS.PRODUCT_LIST ?? 'Products fetched successfully', result, true);
   } catch (err: any) {
-    if (err instanceof AppError) return createResponse(res, err.status, err.message);
+    if (err instanceof AppError) return await createResponse(res, err.status, err.message, undefined, false);
     console.error('listVendorProductsController error:', err);
-    return createResponse(res, 500, err.message || messages.ERROR.SERVER_ERROR);
+    return await createResponse(res, 500, err.message || messages.ERROR.SERVER_ERROR, undefined, false);
   }
 };
 
@@ -330,18 +315,19 @@ export const listProductsByCategoryNamesController = async (
 
     const result = await listProductsByCategoryNames(categories);
 
-    return createResponse(
+    return await createResponse(
       res,
       200,
       messages.SUCCESS.PRODUCT_LIST ?? 'Products fetched successfully',
-      result
+      result,
+      true
     );
   } catch (err: any) {
     if (err instanceof AppError) {
-      return createResponse(res, err.status, err.message);
+      return await createResponse(res, err.status, err.message, undefined, false);
     }
     console.error('listProductsByCategoryNamesController error:', err);
-    return createResponse(res, 500, err.message || messages.ERROR.SERVER_ERROR);
+    return await createResponse(res, 500, err.message || messages.ERROR.SERVER_ERROR, undefined, false);
   }
 };
 
@@ -359,13 +345,13 @@ export const listProductsByCategoryIdsController = async (
 
     const result = await listProductsByCategoryIds(categories);
 
-    return createResponse(res, 200, messages.SUCCESS.PRODUCT_LIST ?? 'Products fetched successfully', result);
+    return await createResponse(res, 200, messages.SUCCESS.PRODUCT_LIST ?? 'Products fetched successfully', result, true);
   } catch (err: any) {
     if (err instanceof AppError) {
-      return createResponse(res, err.status, err.message);
+      return await createResponse(res, err.status, err.message, undefined, false);
     }
     console.error('listProductsByCategoryIdsController error:', err);
-    return createResponse(res, 500, err.message ||messages.ERROR.SERVER_ERROR);
+    return await createResponse(res, 500, err.message || messages.ERROR.SERVER_ERROR, undefined, false);
   }
 };
 

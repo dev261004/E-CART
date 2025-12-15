@@ -148,6 +148,15 @@ export const updateProductValidation = Joi.object({
       'number.base': messages.ERROR.STOCK_NUMBER,
       'number.min': messages.ERROR.STOCK_MIN
     }),
+removeImages: Joi.array()
+  .items(
+    Joi.string()
+      .pattern(urlPattern)
+      .messages({
+        "string.pattern.base": messages.ERROR.IMAGE_INVALID_URL,
+      })
+  )
+  .optional(),
 
   isActive: Joi.boolean().optional()
 }).min(1); // require at least one field to update

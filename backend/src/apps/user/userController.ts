@@ -5,38 +5,56 @@ import AppError from '../../utils/AppError';
 import createResponse from '../../utils/createResponse';
 import messages from '../../utils/messages';
 import { createLinkedDeviceSession } from "../../services/sessionService";
-import { createUser, findUserByEmail, logoutUser, getUserById } from './userServices';
+import { createUser, findUserByEmail, logoutUser, getUserById, updateUserProfile } from './userServices';
 import { generateAccessToken, generateRefreshToken } from '../../services/tokenServices';
-import { ApiResponse, IUserSignup, IUserLogin } from '../../utils/typeAliases';
+import { ApiResponse, IUserSignup, IUserLogin, UpdateProfileRequestBody, UpdateProfilePayload } from '../../utils/typeAliases';
 import User, { UserDocument } from '../../model/userModel';
+import { uploadToCloudinary } from '../../services/cloudinaryService';
 
 export const signupController = async (
   req: Request<{}, ApiResponse, IUserSignup>,
   res: Response<ApiResponse>
 ) => {
   try {
-    const payload = req.body;
+    const payload = req.body;     
+    console.log("Signup payload (backend):", payload);
     const user = await createUser(payload);
 
-    // remove sensitive fields
     const { password, refreshToken, ...safeUser } = user.toObject();
 
-    return createResponse(res, 201, messages.SUCCESS.USER_CREATED, { user: safeUser });
+    // Encrypt success response (recommended)
+    return await createResponse(
+      res,
+      201,
+      messages.SUCCESS.USER_CREATED,
+      { user: safeUser },
+      true     // encrypt = true
+    );
   } catch (err: any) {
     if (err instanceof AppError) {
-      return createResponse(res, err.status, err.message);
+      // For errors, you can choose encryption = false (easier to debug)
+      return await createResponse(res, err.status, err.message, undefined, false);
     }
-    // fallback unexpected error
-    console.error('signupController error:', err);
-    return createResponse(res, 500, err.message || messages.ERROR.SERVER_ERROR);
+
+    console.error("signupController error:", err);
+
+    return await createResponse(
+      res,
+      500,
+      err.message || messages.ERROR.SERVER_ERROR,
+      undefined,
+      false    // plain error response
+    );
   }
 };
+
 
 export const loginController = async (
   req: Request<{}, ApiResponse, IUserLogin>,
   res: Response<ApiResponse>
 ) => {
   try {
+    // req.body is already decrypted if request was encrypted
     const { email, password } = req.body;
 
     const user = await findUserByEmail(email);
@@ -60,34 +78,52 @@ export const loginController = async (
 
     const device = user.linkedDevices.find((d) => d.sessionId === sessionId);
     if (device) {
-      device.accessToken = accessToken;   // 🔹 store access token in DB per session
+      device.accessToken = accessToken;   // store access token per session
+      device.refreshToken = refreshToken;
     }
 
-    // you can store refreshToken per user or in linkedDevices.encryptedPayload (future improvement)
     user.refreshToken = refreshToken;
     await user.save();
 
     const { password: _p, refreshToken: _r, ...safeUser } = user.toObject();
-    res.cookie('refreshToken', refreshToken, {
+
+    // Set cookie as before (not encrypted, cookie is separate)
+    res.cookie("refreshToken", refreshToken, {
       httpOnly: true,
-      //secure: process.env.NODE_ENV === 'production', // true in prod
-      sameSite: 'strict',
-      path: '/',
-      maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days (or match REFRESH_EXPIRES)
+      sameSite: "strict",
+      path: "/",
+      maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
     });
-    return createResponse(res, 200, messages.SUCCESS.LOGIN_SUCCESS, {
-      accessToken,
-      user: safeUser,
-      sessionId
-    });
+
+    // 🔐 Encrypt success response body
+    return await createResponse(
+      res,
+      200,
+      messages.SUCCESS.LOGIN_SUCCESS,
+      {
+        user: safeUser,
+        sessionId,
+        accessToken
+      },  
+      true // encryption ON
+    );
   } catch (err: any) {
     if (err instanceof AppError) {
-      return createResponse(res, err.status, err.message);
+      // For errors you can keep encryption OFF for now (debug-friendly)
+      return await createResponse(res, err.status, err.message, undefined, false);
     }
+
     console.error("loginController error:", err);
-    return createResponse(res, 400, err.message || messages.ERROR.SERVER_ERROR);
+    return await createResponse(
+      res,
+      400,
+      err.message || messages.ERROR.SERVER_ERROR,
+      undefined,
+      false // plain error response
+    );
   }
 };
+
 
 export const logoutController = async (
   req: Request,
@@ -106,37 +142,52 @@ export const logoutController = async (
       throw new AppError(404, messages.ERROR.USER_NOT_FOUND);
     }
 
-    // Remove ONLY this device's session from linkedDevices
-    const beforeCount = user.linkedDevices.length;
+    // 🔥 Remove ONLY this device's session
     user.linkedDevices = user.linkedDevices.filter(
       (d) => d.sessionId !== sessionId
     );
 
-    // Optional: If you want to clear refreshToken when no sessions left
-    if (user.linkedDevices.length === 0) {
-      user.refreshToken = null;
-    }
-
     await user.save();
 
-    // Optional: clear refreshToken cookie if you are using it
+    // 🔐 Clear refresh token cookie for THIS device
     res.clearCookie("refreshToken", {
       httpOnly: true,
-      sameSite: "strict",
-      path: "/",
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "lax",
+      path: "/"
     });
 
-
-    // If nothing was removed, it's still okay (idempotent logout)
-    return createResponse(res, 200, messages.SUCCESS.LOGOUT_SUCCESS);
+    return await createResponse(
+      res,
+      200,
+      messages.SUCCESS.LOGOUT_SUCCESS,
+      undefined,
+      true
+    );
   } catch (err: any) {
     if (err instanceof AppError) {
-      return createResponse(res, err.status, err.message);
+      return await createResponse(
+        res,
+        err.status,
+        err.message,
+        undefined,
+        false
+      );
     }
+
     console.error("logoutController error:", err);
-    return createResponse(res, 500, err.message || messages.ERROR.SERVER_ERROR);
+    return await createResponse(
+      res,
+      500,
+      err.message || messages.ERROR.SERVER_ERROR,
+      undefined,
+      false
+    );
   }
 };
+
+
+
 
 export const getProfileController = async (
   req: Request,
@@ -153,21 +204,101 @@ export const getProfileController = async (
       throw new AppError(404, messages.ERROR.USER_NOT_FOUND);
     }
 
-    const userObj = user.toObject();
-    delete (userObj as Partial<UserDocument>).refreshToken;
-    delete userObj.password;
+    // ✅ Explicit profile DTO – keeps it stable for frontend
+    const profile = {
+      _id: user._id.toString(),
+      name: user.name,
+      email: user.email,
+      role: user.role,
+
+      phoneNumber: user.phoneNumber ?? null,
+      profileImage: user.profileImage ?? null,
+
+      addressLine1: user.addressLine1 ?? "",
+      addressLine2: user.addressLine2 ?? "",
+      city: user.city ?? "",
+      state: user.state ?? "",
+      postalCode: user.postalCode ?? "",
+      country: user.country ?? "",
+    };
+
+    return await createResponse(
+      res,
+      200,
+      messages.SUCCESS.USER_PROFILE_FETCHED ?? "User profile fetched successfully",
+      profile,
+      true // encrypt response
+    );
+  } catch (err: any) {
+    if (err instanceof AppError) {
+      return await createResponse(res, err.status, err.message,undefined,false);
+    }
+    console.error("getProfileController error:", err);
+    return await createResponse(res, 500, err.message || messages.ERROR.SERVER_ERROR,undefined,false);
+  }
+};
+
+
+export const updateProfileController = async (
+  req: Request<{}, ApiResponse, UpdateProfileRequestBody>,
+  res: Response<ApiResponse>
+) => {
+  try {
+    const authUser = req.user;
+    if (!authUser || !authUser.userId) {
+      throw new AppError(401, messages.ERROR.UNAUTHORIZED || "Unauthorized");
+    }
+
+    // body already validated & sanitized by validate(updateProfileValidation)
+    const body = req.body;
+
+    const removeAvatarFlag =
+      body.removeAvatar === true || body.removeAvatar === "true";
+
+    let profileImageUrl: string|null | undefined;
+
+     if (removeAvatarFlag) {
+      // Explicitly clear avatar
+      profileImageUrl = null;
+    } else if (req.file) {
+      // New avatar uploaded -> upload to Cloudinary
+      const uploadResult: any = await uploadToCloudinary(
+        req.file.buffer,
+        "user-avatars"
+      );
+      profileImageUrl = uploadResult.secure_url;
+      // ⚠️ If you want to delete old Cloudinary image, you must store & use public_id.
+    }
+
+    const payload: UpdateProfilePayload = {
+      ...body,
+      // only include profileImage if we actually uploaded a new one
+       profileImage: profileImageUrl,
+    };
+
+    if (profileImageUrl === undefined) {
+      delete (payload as any).profileImage;
+    }
+    const updated = await updateUserProfile(authUser.userId, payload);
 
     return createResponse(
       res,
       200,
-      messages.SUCCESS.USER_PROFILE_FETCHED ?? "User profile fetched successfully",
-      userObj
+      "Profile updated successfully",
+      updated,
+      true // encrypt response
     );
   } catch (err: any) {
     if (err instanceof AppError) {
-      return createResponse(res, err.status, err.message);
+      return await createResponse(res, err.status, err.message,undefined,false);
     }
-    console.error("getProfileController error:", err);
-    return createResponse(res, 500, err.message || messages.ERROR.SERVER_ERROR);
+    console.error("updateProfileController error:", err);
+    return await createResponse(
+      res,
+      500,
+      err.message || messages.ERROR.SERVER_ERROR,
+      undefined,
+      false
+    );
   }
 };

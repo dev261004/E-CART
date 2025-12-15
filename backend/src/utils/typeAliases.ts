@@ -1,5 +1,5 @@
 // src/typealias/typealias.ts
-
+import { IUser } from "../model/userModel";
 // Roles
 export type TRole = "admin" | "vendor" | "buyer";
 
@@ -50,6 +50,8 @@ export interface IUserLogin {
   password: string;
 }
 
+
+
 // CATEGORY Request DTO
 export interface ICategoryCreate {
   name: string;
@@ -95,6 +97,8 @@ export interface IProductUpdate {
   category?: string;
   images?: string[];
   stock?: number;
+  removeImages?: string[]   // existing image URLs to delete
+  
   isActive?: boolean;
 }
 
@@ -149,3 +153,41 @@ export interface ResetPayload {
   otp: string;
   email: string;
 }
+
+export type UpdateProfileResult = Pick<
+  IUser,
+  "_id" | "name" | "email" | "phoneNumber" | "role"
+> & {
+  profileImage?: string | null;
+  addressLine1?: string | null;
+  addressLine2?: string | null;
+  city?: string | null;
+  state?: string | null;
+  postalCode?: string | null;
+  country?: string | null;
+};
+
+export interface UpdateProfilePayload {
+  name?: string;
+  phoneNumber?: string;
+  addressLine1?: string | null;
+  addressLine2?: string | null;
+  city?: string | null;
+  state?: string | null;
+  postalCode?: string | null;
+  country?: string | null;
+  profileImage?: string | null;
+}
+
+export interface UpdateProfileRequestBody {
+  name?: string;
+  phoneNumber?: string;
+  addressLine1?: string | null;
+  addressLine2?: string | null;
+  city?: string | null;
+  state?: string | null;
+  postalCode?: string | null;
+  country?: string | null;
+  removeAvatar?: boolean | string;
+}
+
