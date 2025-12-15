@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import { Outlet, Link, useNavigate, useLocation } from "react-router-dom";
 import { getUser, logoutRequest, clearAuth } from "@/services/authService";
-import { Menu, X, LogOut, UserCircle, ShoppingBag, Heart, Settings,KeyRound,ListTree } from "lucide-react";
+import { Menu, X, LogOut, UserCircle, ShoppingBag, Heart, Settings,KeyRound,ListTree,PlusCircle,User } from "lucide-react";
 
 export default function UserLayout() {
   const navigate = useNavigate();
@@ -19,6 +19,7 @@ export default function UserLayout() {
     { to: "/user/categories", label: "Categories", icon: <ListTree size={18} /> },
     { to: "/user/products", label: "Products", icon: <ListTree size={18} /> },
     { to: "/user/change-password", label: "Change Password", icon: <KeyRound size={18} /> },
+    { to: "/user/update-profile", label: "Update Profile", icon: <PlusCircle size={18} /> },
    
   ];
 
@@ -32,6 +33,11 @@ export default function UserLayout() {
     navigate("/login");
   };
 
+
+  const handleProfileClick = () => {
+    navigate("/user/profile");
+  };
+    const userInitial = user?.name?.charAt(0)?.toUpperCase() ?? "U";
   return (
     <div className="min-h-screen flex bg-slate-50">
       {/* SIDEBAR */}
@@ -51,13 +57,36 @@ export default function UserLayout() {
               <p className="text-xs text-white/80">{user?.name}</p>
             </div>
           ) : (
-            <div className="text-xl font-semibold">{user?.name?.charAt(0) ?? "U"}</div>
+            <button
+              type="button"
+              onClick={handleProfileClick}
+              className="w-9 h-9 rounded-full bg-white/20 flex items-center justify-center text-base font-semibold hover:bg-white/30 transition"
+              aria-label="Open profile"
+            >
+              {userInitial}
+            </button>
           )}
 
-          {/* Mobile close */}
-          <button className="sm:hidden p-2" onClick={() => setMobileOpen(false)}>
-            <X className="text-white" size={18} />
-          </button>
+         <div className="flex items-center gap-2">
+            {/* Profile icon – visible in both modes */}
+            <button
+              type="button"
+              onClick={handleProfileClick}
+              className="p-2 rounded-full hover:bg-white/15 transition"
+              aria-label="Open profile"
+            >
+              <User size={20} className="text-white" />
+            </button>
+
+            {/* Mobile close button */}
+            <button
+              className="sm:hidden p-2"
+              onClick={() => setMobileOpen(false)}
+              aria-label="Close sidebar"
+            >
+              <X size={20} className="text-white" />
+            </button>
+          </div>
         </div>
 
         {/* Navigation */}

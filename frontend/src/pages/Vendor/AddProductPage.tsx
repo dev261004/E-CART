@@ -236,6 +236,8 @@ export default function AddProductPage(): JSX.Element {
       setLoading(false);
       setUploading(false);
     }
+
+    navigate("/vendor/products")
   };
 
   // disable button until all required fields are filled & schema is valid

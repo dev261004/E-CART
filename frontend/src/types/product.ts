@@ -90,3 +90,29 @@ export interface GetProductByIdResponseData {
   stock: number;
   isActive: boolean;
 }
+
+export interface IProductVendor {
+  _id: string;
+  name: string;
+  email: string;
+  phoneNumber?: string;
+  role: "admin" | "vendor" | "buyer" | string;
+}
+
+export interface IProductCategory {
+  _id: string;
+  name: string;
+  isActive: boolean;
+}
+
+export interface IProductDetail {
+  _id: string;
+  title: string;
+  description?: string;
+  price: number;
+  images: string[];
+  stock?: number;
+  isActive: boolean;
+  vendor: IProductVendor;
+  category: IProductCategory;
+}

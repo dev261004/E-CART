@@ -2,7 +2,7 @@
 import React, { useEffect, useState, JSX } from "react";
 import { Outlet, Link, useNavigate, useLocation } from "react-router-dom";
 import { logoutRequest, clearAuth, getUser } from "@/services/authService";
-import { Menu, X, LogOut, PlusSquare, Box, User,KeyRound,ListTree } from "lucide-react";
+import { Menu, X, LogOut, PlusSquare, Box, User, KeyRound, ListTree } from "lucide-react";
 
 export default function VendorLayout(): JSX.Element {
   const navigate = useNavigate();
@@ -35,7 +35,8 @@ export default function VendorLayout(): JSX.Element {
     { to: "/vendor/product/add", label: "Add Product", icon: <PlusSquare size={18} /> },
     { to: "/vendor/products", label: "Products", icon: <Box size={18} /> },
     { to: "/vendor/change-password", label: "Change Password", icon: <KeyRound size={18} /> },
-    { to: "/vendor/categories", label: "Categories", icon: <ListTree size={18} /> }
+    { to: "/vendor/categories", label: "Categories", icon: <ListTree size={18} /> },
+    { to: "/vendor/update-profile  ", label: "Update Profile", icon: <PlusSquare   size={18} /> },
   ];
 
   return (
@@ -86,13 +87,13 @@ export default function VendorLayout(): JSX.Element {
             </button>
 
             {/* Collapse button */}
-            <button
+            {/* <button
               className="hidden sm:inline-flex p-2 rounded hover:bg-white/10"
               onClick={() => setCollapsed((c) => !c)}
               aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
             >
               {collapsed ? "»" : "«"}
-            </button>
+            </button> */}
           </div>
         </div>
 
@@ -130,6 +131,17 @@ export default function VendorLayout(): JSX.Element {
         aria-label="Open menu"
       >
         <Menu size={18} />
+      </button>
+      <button
+        className={`
+          absolute top-3 
+          ${collapsed ? "left-[70px]" : "left-[260px]"} 
+          p-2 bg-white shadow rounded-full hidden sm:flex z-50 transition-all
+        `}
+        onClick={() => setCollapsed(!collapsed)}
+        aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
+      >
+        {collapsed ? "»" : "«"}
       </button>
 
       {/* Main Content */}

@@ -7,6 +7,7 @@ import productService from "@/services/productService";
 import { productSchema, type ProductInput } from "@/validation/productSchema";
 import type { ICategory } from "@/types/category";
 import type { IProduct } from "@/types/product";
+
 import LoadingPage from "@/components/LoadingPage";
 import toast from "react-hot-toast";
 
@@ -16,6 +17,9 @@ export default function VendorEditProductPage(): JSX.Element {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const user = getUser();
+  const MAX_IMAGES = 5;
+
+  const [imageError, setImageError] = useState<string | null>(null);
 
   const [form, setForm] = useState<ProductInput>({
     title: "",
@@ -31,6 +35,10 @@ export default function VendorEditProductPage(): JSX.Element {
   const [loadingSave, setLoadingSave] = useState(false);
   const [errors, setErrors] = useState<FormErrors>({});
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [existingImages, setExistingImages] = useState<string[]>([]);
+  const [newImages, setNewImages] = useState<File[]>([]);
+
+  const [removedImages, setRemovedImages] = useState<string[]>([]);
 
   useEffect(() => {
     if (!user) {
@@ -42,7 +50,7 @@ export default function VendorEditProductPage(): JSX.Element {
   // Load categories + product
   useEffect(() => {
     const load = async () => {
-        
+
       if (!id) {
         setErrorMsg("Missing product id.");
         setLoading(false);
@@ -67,7 +75,9 @@ export default function VendorEditProductPage(): JSX.Element {
           return;
         }
 
-       const p = prodRes.data; 
+        const p = prodRes.data;
+        const imgs = Array.isArray(p.images) ? p.images : [];
+        setExistingImages(imgs);
 
         setForm({
           title: p.title ?? "",
@@ -77,7 +87,7 @@ export default function VendorEditProductPage(): JSX.Element {
               ? p.category
               : (p.category as any)?._id ?? "",
           description: p.description ?? "",
-          images: Array.isArray(p.images) ? p.images : [],
+          images: imgs,
           stock: typeof p.stock === "number" ? p.stock : undefined,
         });
       } catch (err: any) {
@@ -90,6 +100,7 @@ export default function VendorEditProductPage(): JSX.Element {
     load();
   }, [id]);
 
+
   const handleChange = <K extends keyof ProductInput>(
     key: K,
     value: ProductInput[K]
@@ -97,6 +108,24 @@ export default function VendorEditProductPage(): JSX.Element {
     setForm((f) => ({ ...f, [key]: value }));
     setErrors((prev) => ({ ...prev, [key]: "" }));
     setErrorMsg(null);
+  };
+  const handleSelectImages = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files) return;
+
+    const selected = Array.from(files);
+
+    const totalCount =
+      existingImages.length + newImages.length + selected.length;
+
+    if (totalCount > MAX_IMAGES) {
+      setImageError(`You can upload at most ${MAX_IMAGES} images.`);
+      e.target.value = ""; // reset input
+      return;
+    }
+
+    setImageError(null);
+    setNewImages((prev) => [...prev, ...selected]);
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -121,8 +150,26 @@ export default function VendorEditProductPage(): JSX.Element {
 
     setLoadingSave(true);
     try {
+      let uploadedUrls: string[] = [];
+
+
+      // 1️⃣ Upload new images if any
+      if (newImages.length > 0) {
+        const uploadRes = await productService.uploadImages(newImages);
+        console.log("Upload res:", uploadRes);
+        if (uploadRes.error || !uploadRes.data) {
+          throw new Error("Image upload failed");
+        }
+        uploadedUrls = uploadRes.data;
+      }
+
+      // 2️⃣ Final images list
+      const finalImages = [...existingImages, ...uploadedUrls];
+
       const payload = {
         ...parsed.data,
+        images: finalImages,
+        removeImages: removedImages,
         stock:
           typeof parsed.data.stock === "number"
             ? parsed.data.stock
@@ -131,22 +178,18 @@ export default function VendorEditProductPage(): JSX.Element {
 
       const res = await productService.updateProduct(id, payload);
       if (res.error) {
-        setErrorMsg(res.error.message || "Failed to update product.");
-        setErrors((prev) => ({
-          ...prev,
-          ...(res.error?.fields as any),
-        }));
+        setErrorMsg(res.error.message || "Failed to update product");
         return;
       }
 
       toast.success("Product updated successfully");
       navigate("/vendor/products");
     } catch (err: any) {
-      setErrorMsg(err?.message ?? "Failed to update product");
-      toast.error(err?.message ?? "Failed to update product");
+      toast.error(err?.message || "Failed to update product");
     } finally {
       setLoadingSave(false);
     }
+
   };
 
   if (!user) {
@@ -201,9 +244,8 @@ export default function VendorEditProductPage(): JSX.Element {
               <input
                 value={form.title}
                 onChange={(e) => handleChange("title", e.target.value)}
-                className={`mt-1 block w-full rounded-lg px-3 py-2 border text-sm bg-white/70 ${
-                  errors.title ? "border-rose-500" : "border-gray-200"
-                }`}
+                className={`mt-1 block w-full rounded-lg px-3 py-2 border text-sm bg-white/70 ${errors.title ? "border-rose-500" : "border-gray-200"
+                  }`}
                 placeholder="e.g. Ceramic Planter"
               />
               {errors.title && (
@@ -224,9 +266,8 @@ export default function VendorEditProductPage(): JSX.Element {
                   onChange={(e) =>
                     handleChange("price", Number(e.target.value))
                   }
-                  className={`mt-1 block w-full rounded-lg px-3 py-2 border text-sm bg-white/70 ${
-                    errors.price ? "border-rose-500" : "border-gray-200"
-                  }`}
+                  className={`mt-1 block w-full rounded-lg px-3 py-2 border text-sm bg-white/70 ${errors.price ? "border-rose-500" : "border-gray-200"
+                    }`}
                   placeholder="0.00"
                 />
                 {errors.price && (
@@ -251,9 +292,8 @@ export default function VendorEditProductPage(): JSX.Element {
                         : Number(e.target.value)
                     )
                   }
-                  className={`mt-1 block w-full rounded-lg px-3 py-2 border text-sm bg-white/70 ${
-                    errors.stock ? "border-rose-500" : "border-gray-200"
-                  }`}
+                  className={`mt-1 block w-full rounded-lg px-3 py-2 border text-sm bg-white/70 ${errors.stock ? "border-rose-500" : "border-gray-200"
+                    }`}
                   placeholder="e.g. 10"
                 />
                 {errors.stock && (
@@ -272,9 +312,8 @@ export default function VendorEditProductPage(): JSX.Element {
               <select
                 value={form.category}
                 onChange={(e) => handleChange("category", e.target.value)}
-                className={`mt-1 block w-full rounded-lg px-3 py-2 border text-sm bg-white/70 ${
-                  errors.category ? "border-rose-500" : "border-gray-200"
-                }`}
+                className={`mt-1 block w-full rounded-lg px-3 py-2 border text-sm bg-white/70 ${errors.category ? "border-rose-500" : "border-gray-200"
+                  }`}
               >
                 <option value="">-- Select category --</option>
                 {categories.map((c) => (
@@ -299,9 +338,8 @@ export default function VendorEditProductPage(): JSX.Element {
                 value={form.description ?? ""}
                 onChange={(e) => handleChange("description", e.target.value)}
                 rows={5}
-                className={`mt-1 block w-full rounded-lg px-3 py-2 border text-sm bg-white/70 ${
-                  errors.description ? "border-rose-500" : "border-gray-200"
-                }`}
+                className={`mt-1 block w-full rounded-lg px-3 py-2 border text-sm bg-white/70 ${errors.description ? "border-rose-500" : "border-gray-200"
+                  }`}
                 placeholder="Describe the product..."
               />
               {errors.description && (
@@ -311,23 +349,84 @@ export default function VendorEditProductPage(): JSX.Element {
               )}
             </div>
 
-            {/* <div className="text-xs text-gray-500 bg-indigo-50 border border-indigo-100 rounded-lg px-3 py-2">
-              Images are kept as-is for now. If you want to support editing
-              images, we can reuse the upload logic from Add Product.
-            </div> */}
+            {/* Images */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700">
+                Product Images
+              </label>
+
+              {/* Existing images */}
+              <div className="mt-2 grid grid-cols-2 sm:grid-cols-4 gap-3">
+                {existingImages.map((img) => (
+                  <div key={img} className="relative group">
+                    <img
+                      src={img}
+                      className="h-28 w-full object-cover rounded-lg border"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setRemovedImages((prev) => [...prev, img]);
+                        setExistingImages((prev) => prev.filter((i) => i !== img));
+                        setImageError(null); // 👈 important
+                      }}
+                      className="absolute top-1 right-1 bg-white/90 rounded-full p-1
+             text-rose-600 opacity-0 group-hover:opacity-100 transition"
+                    >
+                      ✕
+                    </button>
+
+                  </div>
+                ))}
+              </div>
+
+              {/* New image preview */}
+              {newImages.length > 0 && (
+                <div className="mt-3 grid grid-cols-2 sm:grid-cols-4 gap-3">
+                  {newImages.map((file, idx) => (
+                    <div key={idx} className="relative">
+                      <img
+                        src={URL.createObjectURL(file)}
+                        className="h-28 w-full object-cover rounded-lg border"
+                      />
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {/* Upload */}
+              <label className="mt-3 inline-flex cursor-pointer items-center gap-2 rounded-full
+                    border px-3 py-1.5 text-xs bg-white hover:bg-gray-50">
+                + Add images
+                <input
+                  type="file"
+                  accept="image/*"
+                  multiple
+                  hidden
+                  onChange={handleSelectImages}
+                />
+
+              </label>
+            </div>
+            {imageError && (
+              <p className="mt-2 text-xs text-rose-600">
+                {imageError}
+              </p>
+            )}
+
 
             <div className="flex items-center gap-3 mt-4">
               <button
                 type="submit"
-                disabled={loadingSave}
-                className={`px-4 py-2 rounded-full text-sm text-white font-medium ${
-                  loadingSave
-                    ? "bg-indigo-300 cursor-not-allowed"
-                    : "bg-indigo-600 hover:bg-indigo-700"
-                }`}
+                disabled={loadingSave || !!imageError}
+                className={`px-4 py-2 rounded-full text-sm text-white font-medium ${loadingSave || imageError
+                  ? "bg-indigo-300 cursor-not-allowed"
+                  : "bg-indigo-600 hover:bg-indigo-700"
+                  }`}
               >
                 {loadingSave ? "Saving..." : "Save changes"}
               </button>
+
               <button
                 type="button"
                 onClick={() => navigate("/vendor/products")}

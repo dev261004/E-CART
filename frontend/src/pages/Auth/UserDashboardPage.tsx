@@ -40,7 +40,7 @@ export default function UserDashboardPage(): JSX.Element {
         <div className="flex items-center gap-3">
           <button
             type="button"
-            onClick={() => navigate("/profile")}
+            onClick={() => navigate("/user/profile")}
             className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full border border-slate-200 text-xs sm:text-sm text-slate-700 hover:bg-slate-50"
           >
             <UserCircle size={16} />
@@ -48,7 +48,7 @@ export default function UserDashboardPage(): JSX.Element {
           </button>
           <button
             type="button"
-            onClick={() => navigate("/change-password")}
+            onClick={() => navigate("/user/change-password")}
             className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-indigo-600 text-xs sm:text-sm text-white hover:bg-indigo-700"
           >
             <KeyRound size={16} />

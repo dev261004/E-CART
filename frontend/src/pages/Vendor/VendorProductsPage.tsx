@@ -192,6 +192,7 @@ export default function VendorProductsPage(): JSX.Element {
                 type="search"
                 placeholder="Search title"
                 value={search}
+                autoFocus
                 onChange={(e) => setSearch(e.target.value)}
                 className="w-full sm:w-56 rounded-lg px-3 py-2 border border-gray-200 bg-white/60 text-sm"
               />

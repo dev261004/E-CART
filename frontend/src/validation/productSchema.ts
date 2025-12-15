@@ -47,4 +47,9 @@ export const productSchema = z.object({
   isActive: z.boolean().optional()
 });
 
+export const productIdSchema = z
+  .string()
+  .min(1, "Product id is required")
+  .regex(/^[0-9a-fA-F]{24}$/, "Invalid product id");
+  
 export type ProductInput = z.infer<typeof productSchema>;

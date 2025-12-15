@@ -6,10 +6,11 @@ import { useAsync } from "@/hooks/useAsync";
 import LoadingPage from "@/components/LoadingPage";
 import { useServerErrors } from "@/hooks/useServerErrors";
 import * as userService from "@/services/userService";
-import type { GetProfileResponseData } from "@/services/userService";
+import type { GetProfileResponseData } from "@/types/profile"; 
 import type { ApiResult } from "@/types/api";
 import { userProfileSchema, type UserProfile } from "@/validation/profileSchema";
 import messages from "@/utils/messages";
+import { getUser } from "@/services/authService";
 
 export default function UserProfilePage(): JSX.Element {
   const navigate = useNavigate();
@@ -19,7 +20,6 @@ export default function UserProfilePage(): JSX.Element {
   const { loading, run } = useAsync();
   const {
     errors,
-    // getError,  // not really needed here, everything is global
     setErrorsObject,
     handleServerError,
     clearErrors,
@@ -39,25 +39,29 @@ export default function UserProfilePage(): JSX.Element {
       return;
     }
 
-    const apiResult = runResult as ApiResult<GetProfileResponseData>;
+const apiResult = runResult as ApiResult<GetProfileResponseData>;
 
-    if (apiResult.error) {
-      setErrorsObject({
-        ...(apiResult.error.fields || {}),
-        global: apiResult.error.message || messages.ERROR.SERVER_ERROR,
-      });
-      return;
-    }
+if (apiResult.error) {
+  setErrorsObject({
+    ...(apiResult.error.fields || {}),
+    global: apiResult.error.message || messages.ERROR.SERVER_ERROR,
+  });
+  return;
+}
 
-    const data = apiResult.data;
-    if (!data) {
-      setErrorsObject({
-        global: "Profile data is missing.",
-      });
-      return;
-    }
+// 🔐 IMPORTANT CHANGE
+const data =
+  (apiResult as any).decrypted ?? apiResult.data;
 
-    const parsed = userProfileSchema.safeParse(data);
+if (!data) {
+  setErrorsObject({
+    global: "Profile data is missing.",
+  });
+  return;
+}
+
+const parsed = userProfileSchema.safeParse(data);
+
     if (!parsed.success) {
       setErrorsObject({
         global: "Received invalid profile data. Please try again later.",
@@ -88,6 +92,8 @@ export default function UserProfilePage(): JSX.Element {
     ? profile.role.charAt(0).toUpperCase() + profile.role.slice(1)
     : "";
 
+  const avatarSrc = profile?.profileImage || null;
+
   // small helper for label/value rows
   const FieldRow = ({
     label,
@@ -105,6 +111,18 @@ export default function UserProfilePage(): JSX.Element {
       </span>
     </div>
   );
+
+  const handleNavigateToUpdate = () => {
+  const user = getUser(); 
+  if (!user) {
+    navigate("/login");
+    return;
+  }
+
+  if (user.role === "admin") navigate("/admin/update-profile");
+  else if (user.role === "vendor") navigate("/vendor/update-profile");
+  else navigate("/user/update-profile"); 
+};
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-indigo-50 via-white to-indigo-100 p-4">
@@ -127,10 +145,10 @@ export default function UserProfilePage(): JSX.Element {
             <div className="flex flex-col sm:flex-row sm:items-end gap-6">
               {/* Avatar */}
               <div className="flex-shrink-0">
-                {profile?.avatarUrl ? (
+                {avatarSrc ? (
                   <img
-                    src={profile.avatarUrl}
-                    alt={profile.name}
+                    src={avatarSrc}
+                    alt={profile?.name || "Profile avatar"}
                     className="w-24 h-24 rounded-2xl border-4 border-white shadow-lg object-cover"
                   />
                 ) : (
@@ -148,36 +166,9 @@ export default function UserProfilePage(): JSX.Element {
                       {profile?.name || "Your Profile"}
                     </h3>
                     <p className="text-sm text-gray-600">
-                      Manage your account information and preferences.
+                      View and manage your personal information.
                     </p>
-                  </div>
-
-                  {profile && (
-                    <div className="flex flex-wrap gap-2 sm:justify-end">
-                      {/* Role badge */}
-                      <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-indigo-50 text-indigo-700 border border-indigo-100">
-                        {roleLabel || "User"}
-                      </span>
-
-                      {/* Active status */}
-                      {typeof profile.isActive === "boolean" && (
-                        <span
-                          className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold border ${
-                            profile.isActive
-                              ? "bg-emerald-50 text-emerald-700 border-emerald-100"
-                              : "bg-rose-50 text-rose-700 border-rose-100"
-                          }`}
-                        >
-                          <span
-                            className={`w-1.5 h-1.5 rounded-full mr-1.5 ${
-                              profile.isActive ? "bg-emerald-500" : "bg-rose-500"
-                            }`}
-                          />
-                          {profile.isActive ? "Active" : "Inactive"}
-                        </span>
-                      )}
-                    </div>
-                  )}
+                  </div> 
                 </div>
               </div>
             </div>
@@ -208,23 +199,36 @@ export default function UserProfilePage(): JSX.Element {
             {/* Details */}
             {profile && (
               <div className="mt-8 grid grid-cols-1 sm:grid-cols-2 gap-6">
+                {/* Basic info */}
                 <FieldRow label="Full name" value={profile.name} />
                 <FieldRow label="Email" value={profile.email} />
                 <FieldRow label="Phone number" value={profile.phoneNumber || ""} />
                 <FieldRow label="Role" value={roleLabel} />
 
-                {/* You can add more fields here once backend returns them */}
-                {/* <FieldRow label="Address" value={profile.address || ""} /> */}
+                {/* Address fields */}
+                <FieldRow label="Address line 1" value={profile.addressLine1 || ""} />
+                <FieldRow label="Address line 2" value={profile.addressLine2 || ""} />
+                <FieldRow label="City" value={profile.city || ""} />
+                <FieldRow label="State" value={profile.state || ""} />
+                <FieldRow label="Postal code" value={profile.postalCode || ""} />
+                <FieldRow label="Country" value={profile.country || ""} />
               </div>
             )}
 
-            {/* Actions row (placeholder for future editing) */}
+            {/* Actions row */}
             <div className="mt-8 flex flex-col sm:flex-row gap-3 sm:items-center sm:justify-between">
+              <button
+                type="button"
+                onClick={handleNavigateToUpdate} 
+                className="inline-flex items-center justify-center px-4 py-2 rounded-full text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 shadow"
+              >
+                Update profile
+              </button>
+
               <p className="text-xs text-gray-500">
-                If any of your details are incorrect, please contact support or update them from your account settings (if enabled).
+                *  Keep your contact and address details up to date to ensure smooth
+                deliveries and secure account recovery.
               </p>
-
-
             </div>
           </div>
         </div>

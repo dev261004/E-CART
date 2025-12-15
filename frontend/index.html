@@ -8,6 +8,27 @@
   </head>
   <body>
     <div id="root"></div>
+
+    <!--
+      Runtime env injection:
+      Replace the placeholder values below with the exact hex strings you use on the backend.
+      IMPORTANT: these values are visible to anyone using the app (browser). This is for dev/testing only.
+      Example (hex lengths):
+        ENCRYPTION_KEY  -> 64 hex chars (32 bytes)
+        ENCRYPTION_IV   -> 32 hex chars (16 bytes)
+    -->
+    <script>
+      window.__ENV = {
+        VITE_PUBLIC_AUTH_KEY: '9be7afb0c5a81efa2e30a3e86adc6e57d08c79032368dc4b312c733847bdbb64',
+        VITE_PUBLIC_AUTH_IV: "14407abecc818f67b6f49b514b37d824",
+        VITE_PUBLIC_API_URL: "http://192.168.1.243:4000"
+      };
+      // quick sanity: expose abbreviated values in console so you can check they loaded
+      // Remove or comment out in production if you prefer not to log.
+      console.log("[__ENV] auth key head:", (window.__ENV.VITE_PUBLIC_AUTH_KEY || "").slice(0,8));
+      console.log("[__ENV] auth iv head:", (window.__ENV.VITE_PUBLIC_AUTH_IV || "").slice(0,8));
+    </script>
+
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>

@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 // src/services/authService.ts
 import { IUser } from "@/types/user";
 import axios from "axios";
@@ -60,15 +61,21 @@ const refreshClient = axios.create({
 
 export const refreshAccessToken = async (): Promise<string | null> => {
   try {
-    const res = await refreshClient.post("/api/auth/refresh", {});
-    const data = res?.data?.data ?? res?.data;
-    const newAccess = data?.accessToken ?? null;
-    if (newAccess) {
-      setAccessToken(newAccess);
-    }
+    const res = await refreshClient.post(
+      "/api/auth/refresh",
+      {},
+      {
+        headers: {
+     
+          "X-Encrypt": "0",     // 🚨 force disable encryption
+        },
+      }
+    );
+
+    const newAccess = res.data?.data?.accessToken;
+    if (newAccess) setAccessToken(newAccess);
     return newAccess;
   } catch (err: any) {
-    // refresh failed (401, invalid token, etc.)
     console.warn("[authService] refreshAccessToken failed", err?.response?.status);
     return null;
   }
@@ -85,20 +92,64 @@ export const logoutRequest = async () => {
   }
 };
 
-export async function forgotPassword(payload: { email: string }) {
-  const res = await api.post("/api/auth/forgot-password", payload);
-  return res.data as ApiResult<ApiResponse>;
+export async function forgotPassword(
+  payload: { email: string }
+): Promise<ApiResult<ApiResponse>> {
+  const res = await api.post(
+    "/api/auth/forgot-password",
+    payload,
+    {
+      headers: {
+        "X-Encrypt": "1", // 🔐 trigger encryption
+      },
+    }
+  );
+
+  const envelope = res?.data ?? {};
+
+  // 🔐 prefer decrypted payload if present
+  const responseData =
+    (envelope as any).decrypted ?? envelope.data ?? null;
+
+  return {
+    data: responseData,
+    message: envelope.message,
+    error: envelope.error ?? null,
+  };
 }
+
 
 export async function resetPassword(payload: IResetPasswordPayload) {
   const res = await api.post("/api/auth/reset-password", payload);
   return res.data as ApiResult<ApiResponse>;
 }
 
-export async function resendOtp(payload: { email: string }) {
-  const res = await api.post("/api/auth/resend-otp", payload);
-  return res.data as ApiResult<{ message?: string; resetToken?: string }>;
+export async function resendOtp(
+  payload: { email: string }
+): Promise<ApiResult<{ message?: string; resetToken?: string }>> {
+  const res = await api.post(
+    "/api/auth/resend-otp",
+    payload,
+    {
+      headers: {
+        "X-Encrypt": "1", // 🔐 trigger encryption
+      },
+    }
+  );
+
+  const envelope = res?.data ?? {};
+
+  // 🔐 prefer decrypted payload if present
+  const responseData =
+    (envelope as any).decrypted ?? envelope.data ?? null;
+
+  return {
+    data: responseData,
+    message: envelope.message,
+    error: envelope.error ?? null,
+  };
 }
+
 
 // 🔹 UPDATED: changePassword now also updates accessToken and gives watcher a grace period
 const changePassword = async (
@@ -108,21 +159,25 @@ const changePassword = async (
     const res = await api.post("/api/auth/change-password", payload, {
       withCredentials: true,
     });
-    const envelope = res?.data ?? {};
-    const data = envelope.data as ChangePasswordResponseData | null;
 
-    // data is expected: { accessToken, refreshToken }
+    const envelope = res?.data ?? {};
+//console.log("change-password decrypted:", envelope.decrypted);
+
+    // 🔐 IMPORTANT: prefer decrypted payload
+    const data =
+      (envelope as any).decrypted ??
+      envelope.data ??
+      null;
+
     if (data?.accessToken) {
-      // store new access token immediately
       setAccessToken(data.accessToken);
 
-      // important: give session watcher a small grace period so that
-      // if there is any transient 401 / timing issue, this device is not logged out
-      suppressSessionWatcherLogoutFor(15000); // 15 seconds
+      // Grace period so this device isn't logged out
+      suppressSessionWatcherLogoutFor(10000);
     }
 
     return {
-      data: data ?? null,
+      data,
       message: envelope.message,
       error: null,
     };
@@ -132,9 +187,14 @@ const changePassword = async (
       server?.message ?? err?.message ?? "Failed to change password";
     const fields = server?.data?.errors || server?.errors || undefined;
 
-    return { data: null, message: undefined, error: { message, fields } };
+    return {
+      data: null,
+      message: undefined,
+      error: { message, fields },
+    };
   }
 };
+
 
 export default {
   changePassword,

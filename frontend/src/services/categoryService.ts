@@ -9,47 +9,76 @@ import type { ApiResult } from "@/types/api";
  * createCategory - calls backend create category endpoint
  * Returns ApiResult<CreateCategoryResponse>
  */
-const createCategory = async (payload: ICategoryCreate): Promise<ApiResult<CreateCategoryResponse>> => {
+export const createCategory = async (
+  payload: ICategoryCreate
+): Promise<ApiResult<CreateCategoryResponse>> => {
   try {
-    // Adjust endpoint if your backend uses different base path
-    const res = await api.post("/api/category/create", payload);
-    // normalized envelope: { success, message, data }
-    const envelope = res.data ?? {};
-    return {
-      data: envelope.data ?? envelope,
-      message: envelope.message,
-      error: null
-    };
-  } catch (err: any) {
-    // Normalize error into ApiResult.error: { message, fields? }
-    const server = err?.response?.data;
-    const message = server?.message ?? err?.message ?? "Something went wrong";
-    const fields = server?.data?.errors || server?.errors || undefined;
-    return {
-      data: null,
-      message: undefined,
-      error: {
-        message,
-        fields
+    const res = await api.post(
+      "/api/category/create",
+      payload,
+      {
+        headers: {
+          "X-Encrypt": "1", // 🔐 REQUIRED
+        },
       }
-    };
-  }
-};
+    );
 
-const getCategories = async (query: ICategoryQuery = {}): Promise<ApiResult<IListCategoriesResult>> => {
-  try {
-    // Pass through sortBy and sortOrder as-is (backend whitelist expected)
-    const res = await api.get("/api/category", { params: query });
-    const envelope = res.data ?? {};
+    const envelope = res?.data ?? {};
+
+    // 🔐 prefer decrypted payload if present
+    const responseData =
+      (envelope as any).decrypted ?? envelope.data ?? null;
+
     return {
-      data: envelope.data ?? null,
+      data: responseData,
       message: envelope.message,
       error: null,
     };
   } catch (err: any) {
     const server = err?.response?.data;
-    const message = server?.message ?? err?.message ?? "Failed to fetch categories";
-    const fields = server?.data?.errors || server?.errors || undefined;
+    const message =
+      server?.message ?? err?.message ?? "Something went wrong";
+    const fields =
+      server?.data?.errors || server?.errors || undefined;
+
+    return {
+      data: null,
+      message: undefined,
+      error: {
+        message,
+        fields,
+      },
+    };
+  }
+};
+
+
+export const getCategories = async (
+  query: ICategoryQuery = {}
+): Promise<ApiResult<IListCategoriesResult>> => {
+  try {
+    const res = await api.get("/api/category", {
+      params: query,
+    });
+
+    const envelope = res?.data ?? {};
+
+    // 🔐 IMPORTANT: prefer decrypted payload
+    const responseData =
+      (envelope as any).decrypted ?? envelope.data ?? null;
+
+    return {
+      data: responseData,
+      message: envelope.message,
+      error: null,
+    };
+  } catch (err: any) {
+    const server = err?.response?.data;
+    const message =
+      server?.message ?? err?.message ?? "Failed to fetch categories";
+    const fields =
+      server?.data?.errors || server?.errors || undefined;
+
     return {
       data: null,
       message: undefined,
@@ -58,10 +87,47 @@ const getCategories = async (query: ICategoryQuery = {}): Promise<ApiResult<ILis
   }
 };
 
-async function setCategoryActive(id: string, isActive: boolean): Promise<ApiResult<any>> {
-  const res = await api.patch(`/api/category/active/${id}`, { isActive });
-  return res.data;
-}
+export const setCategoryActive = async (
+  id: string,
+  isActive: boolean
+): Promise<ApiResult<any>> => {
+  try {
+    const res = await api.patch(
+      `/api/category/active/${id}`,
+      { isActive },
+      {
+        headers: {
+          "X-Encrypt": "1", // 🔐 REQUIRED for PATCH with body
+        },
+      }
+    );
+
+    const envelope = res?.data ?? {};
+
+    // 🔐 prefer decrypted payload if present
+    const payload =
+      (envelope as any).decrypted ?? envelope.data ?? null;
+
+    return {
+      data: payload,
+      message: envelope.message,
+      error: null,
+    };
+  } catch (err: any) {
+    const server = err?.response?.data;
+    const message =
+      server?.message ?? err?.message ?? "Failed to update category";
+    const fields =
+      server?.data?.errors || server?.errors || undefined;
+
+    return {
+      data: null,
+      message: undefined,
+      error: { message, fields },
+    };
+  }
+};
+
 export default {
   createCategory,
   getCategories,

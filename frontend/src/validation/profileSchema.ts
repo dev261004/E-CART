@@ -3,14 +3,20 @@ import { z } from "zod";
 
 export const userProfileSchema = z.object({
   _id: z.string(),
-  name: z.string().min(1, "Name is required"),
-  email: z.string().email("Invalid email address"),
-  phoneNumber: z.string().optional().nullable(),
+  name: z.string(),
+  email: z.string().email(),
   role: z.enum(["admin", "vendor", "buyer"]),
-  isActive: z.boolean().optional().nullable(),
-  avatarUrl: z.string().url().optional().nullable(),
-  // add more optional fields if your backend returns them:
-  // address: z.string().optional().nullable(),
+ 
+
+  phoneNumber: z.string().optional().nullable(),
+  profileImage: z.string().url().optional().nullable(),
+
+  addressLine1: z.string().optional().nullable(),
+  addressLine2: z.string().optional().nullable(),
+  city: z.string().optional().nullable(),
+  state: z.string().optional().nullable(),
+  postalCode: z.string().optional().nullable(),
+  country: z.string().optional().nullable(),
 });
 
 export type UserProfile = z.infer<typeof userProfileSchema>;

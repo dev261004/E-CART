@@ -67,9 +67,7 @@ export default function LoginPage(): JSX.Element {
 
     if (fieldName === "email") {
       normalized = value.replace(/\s+/g, "").toLowerCase();
-    } else if (fieldName === "password") {
-      normalized = value.replace(/\s+/g, ""); // no spaces allowed
-    } else {
+    }  else {
       normalized = value.trimStart();
     }
 
@@ -114,27 +112,40 @@ export default function LoginPage(): JSX.Element {
     }
 
     const apiResult = runResult as ApiResult<LoginResponseData>;
-    if (apiResult.error) {
-      setErrorsObject({
-        ...(apiResult.error.fields || {}),
-        global: apiResult.error.message || messages.ERROR.SERVER_ERROR,
-      });
-      return;
-    }
+//console.log("FULL apiResult:", apiResult);
+//console.log("apiResult.data:", apiResult.data);
+//console.log("apiResult.error:", apiResult.error); 
+if (apiResult.error || !apiResult.data) {
+  toast.error(apiResult.error?.message ?? "Login failed");
+  return;
+}
 
-    const success = apiResult.data!;
-    if (success.accessToken) setAccessToken(success.accessToken);
-    if (success.user) setUser(success.user);
-    if (success.sessionId) setSessionId(success.sessionId);
+// 🔐 READ FROM decrypted
+const success = apiResult.data;
 
-    toast.success("Login successful");
+//console.log("Login success data:", success);
+if (!success) {
+  toast.error("Invalid login response");
+  return;
+}
 
-    setTimeout(() => {
-      const role = success.user?.role;
-      if (role === "admin") navigate("/admin");
-      else if (role === "vendor") navigate("/vendor");
-      else navigate("/user");
-    }, 200);
+//  console.log("accessToken from login:", success.accessToken);
+if (success.accessToken) setAccessToken(success.accessToken);
+if (success.user) setUser(success.user);
+if (success.sessionId) setSessionId(success.sessionId);
+
+toast.success("Login successful");
+
+setTimeout(() => {
+  const role =  success?.user?.role;
+ //console.log("user from login :",success.user);
+  //console.log("Navigating based on role:", role);
+  if (role === "admin") navigate("/admin");
+  else if (role === "vendor") navigate("/vendor");
+  else if (role === "buyer") navigate("/user");
+  else navigate("/unauthorized");
+}, 200);
+
   };
 
   // disable button until valid

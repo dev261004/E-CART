@@ -6,8 +6,9 @@ import {
   IndianRupee,
   ShoppingCart,
   Filter,
+  Eye
 } from "lucide-react";
-
+import { useNavigate, Link } from "react-router-dom";
 import productService from "@/services/productService";
 import categoryService from "@/services/categoryService";
 import type {
@@ -35,6 +36,8 @@ export default function BuyerProductListPage(): JSX.Element {
   const [page, setPage] = useState<number>(1);
   const [limit, setLimit] = useState<number>(DEFAULT_LIMIT);
   const [categories, setCategories] = useState<CategoryOption[]>([]);
+
+  const navigate = useNavigate();
 
   const [filters, setFilters] = useState<ProductListFilterInput>({
     search: "",
@@ -255,11 +258,10 @@ export default function BuyerProductListPage(): JSX.Element {
           <button
             disabled={!products.hasPrev}
             onClick={() => goToPage(page - 1)}
-            className={`px-3 py-1 rounded-full border text-sm ${
-              !products.hasPrev
-                ? "opacity-40 cursor-not-allowed"
-                : "hover:bg-gray-100"
-            }`}
+            className={`px-3 py-1 rounded-full border text-sm ${!products.hasPrev
+              ? "opacity-40 cursor-not-allowed"
+              : "hover:bg-gray-100"
+              }`}
           >
             Prev
           </button>
@@ -269,11 +271,10 @@ export default function BuyerProductListPage(): JSX.Element {
               <button
                 key={p}
                 onClick={() => goToPage(p)}
-                className={`px-3 py-1 rounded-full text-sm ${
-                  p === page
-                    ? "bg-indigo-600 text-white"
-                    : "border hover:bg-gray-100"
-                }`}
+                className={`px-3 py-1 rounded-full text-sm ${p === page
+                  ? "bg-indigo-600 text-white"
+                  : "border hover:bg-gray-100"
+                  }`}
               >
                 {p}
               </button>
@@ -283,11 +284,10 @@ export default function BuyerProductListPage(): JSX.Element {
           <button
             disabled={!products.hasNext}
             onClick={() => goToPage(page + 1)}
-            className={`px-3 py-1 rounded-full border text-sm ${
-              !products.hasNext
-                ? "opacity-40 cursor-not-allowed"
-                : "hover:bg-gray-100"
-            }`}
+            className={`px-3 py-1 rounded-full border text-sm ${!products.hasNext
+              ? "opacity-40 cursor-not-allowed"
+              : "hover:bg-gray-100"
+              }`}
           >
             Next
           </button>
@@ -396,20 +396,39 @@ export default function BuyerProductListPage(): JSX.Element {
                   )}
                 </div>
 
-                <button
-                  type="button"
-                  className={`mt-4 w-full inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-full text-sm font-medium shadow-sm transition ${
-                    prod.stock !== undefined && prod.stock <= 0
-                      ? "bg-gray-200 text-gray-500 cursor-not-allowed"
+                {/* 👇 New small buttons row */}
+                <div className="mt-4 flex items-center justify-between">
+                  {/* View / details button */}
+                  <Link
+                    to={`/product/${prod._id}`}
+                    className="inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-100"
+                  >
+                    <Eye size={14} />
+                    <span>View details</span>
+                  </Link>
+
+                  {/* Small cart icon button */}
+                  <button
+                    type="button"
+                    disabled={prod.stock !== undefined && prod.stock <= 0}
+                    onClick={() => {
+                      if (prod.stock !== undefined && prod.stock <= 0) return;
+                      // TODO: add to cart logic here
+                    }}
+                    className={`inline-flex items-center justify-center rounded-full w-9 h-9 text-sm shadow-sm transition ${prod.stock !== undefined && prod.stock <= 0
+                      ? "bg-gray-200 text-gray-400 cursor-not-allowed"
                       : "bg-indigo-600 text-white hover:bg-indigo-700"
-                  }`}
-                  disabled={prod.stock !== undefined && prod.stock <= 0}
-                >
-                  <ShoppingCart size={16} />
-                  {prod.stock !== undefined && prod.stock <= 0
-                    ? "Out of stock"
-                    : "Add to cart"}
-                </button>
+                      }`}
+                    aria-label={
+                      prod.stock !== undefined && prod.stock <= 0
+                        ? "Out of stock"
+                        : "Add to cart"
+                    }
+                  >
+                    <ShoppingCart size={16} />
+                  </button>
+                </div>
+
               </div>
             </div>
           );
@@ -453,6 +472,7 @@ export default function BuyerProductListPage(): JSX.Element {
               <Search className="w-4 h-4 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" />
               <input
                 name="search"
+                autoFocus
                 value={filters.search || ""}
                 onChange={handleFilterChange}
                 placeholder="Search by product name..."

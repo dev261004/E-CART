@@ -5,21 +5,36 @@ import type {
   CreateProductResponse,
   IProductsListResult,
   IProductQuery,
+  IProductDetail,
   GetProductByIdResponseData,
 } from "@/types/product";
 import type { ApiResult } from "@/types/api";
 
 // CREATE PRODUCT
-const createProduct = async (
+
+export const createProduct = async (
   payload: IProductCreate
 ): Promise<ApiResult<CreateProductResponse>> => {
   try {
-    const res = await api.post("/api/product/create", payload, {
-      withCredentials: true,
-    });
+    const res = await api.post(
+      "/api/product/create",
+      payload,
+      {
+        withCredentials: true,
+        headers: {
+          "X-Encrypt": "1", // 🔐 REQUIRED
+        },
+      }
+    );
+
     const envelope = res?.data ?? {};
+
+    // 🔐 prefer decrypted payload
+    const data =
+      (envelope as any).decrypted ?? envelope.data ?? null;
+
     return {
-      data: envelope.data ?? envelope,
+      data,
       message: envelope.message,
       error: null,
     };
@@ -27,19 +42,20 @@ const createProduct = async (
     const server = err?.response?.data;
     const message =
       server?.message ?? err?.message ?? "Failed to create product";
-    const fields = server?.data?.errors || server?.errors || undefined;
-    return { data: null, message: undefined, error: { message, fields } };
+    const fields =
+      server?.data?.errors || server?.errors || undefined;
+
+    return {
+      data: null,
+      message: undefined,
+      error: { message, fields },
+    };
   }
 };
 
-// UPLOAD IMAGES
-const uploadImages = async (
-  files: File[]
-): Promise<ApiResult<string[]>> => {
-  if (!files || files.length === 0) {
-    return { data: [], message: "No files to upload", error: null };
-  }
 
+// UPLOAD IMAGES
+const uploadImages = async (files: File[]): Promise<ApiResult<string[]>> => {
   try {
     const fd = new FormData();
     files.forEach((f) => fd.append("images", f));
@@ -50,51 +66,68 @@ const uploadImages = async (
     });
 
     const envelope = res?.data ?? {};
-    const urls: string[] = envelope?.data?.urls ?? envelope?.data ?? [];
+
+    // 🔐 IMPORTANT FIX
+    const payload =
+      (envelope as any).decrypted ?? envelope.data ?? null;
+
+    const urls = payload?.urls ?? payload;
 
     if (!Array.isArray(urls)) {
+      console.error("Upload payload:", payload);
       return {
         data: null,
-        message: "Unexpected response from upload endpoint",
-        error: { message: "Unexpected response format" },
+        error: { message: "Invalid upload response format" },
       };
     }
 
     return {
       data: urls,
-      message: envelope.message ?? "Images uploaded",
+      message: envelope.message,
+      error: null,
+    };
+  } catch (err: any) {
+    return {
+      data: null,
+      error: { message: err?.message || "Image upload failed" },
+    };
+  }
+};
+
+
+
+
+// GET PRODUCT BY ID
+export const getProductById = async (
+  id: string
+): Promise<ApiResult<IProductDetail>> => {
+  try {
+    const res = await api.get(`/api/product/${id}`, {
+      withCredentials: true,
+    });
+
+    const envelope = res?.data ?? {};
+
+    // 🔐 prefer decrypted payload if present
+    const payload =
+      (envelope as any).decrypted ?? envelope.data ?? null;
+
+    return {
+      data: payload,
+      message: envelope.message,
       error: null,
     };
   } catch (err: any) {
     const server = err?.response?.data;
     const message =
-      server?.message ?? err?.message ?? "Image upload failed";
+      server?.message ?? err?.message ?? "Failed to fetch product details";
+    const fields = server?.data?.errors || server?.errors || undefined;
+
     return {
       data: null,
       message: undefined,
-      error: { message, fields: server?.data },
+      error: { message, fields },
     };
-  }
-};
-
-// GET PRODUCT BY ID
-const getProductById = async (
-  id: string
-): Promise<ApiResult<GetProductByIdResponseData>> => {
-  try {
-    // Adjust path if your backend route is different
-    const res = await api.get(`/api/product/${id}`, { withCredentials: true });
-    return {
-      data: res.data.data,    
-      message: res.data.message,
-      error: null
-    };
-  } catch (err: any) {
-    const server = err?.response?.data;
-    const message =
-      server?.message ?? err?.message ?? "Failed to fetch product";
-    const fields = server?.data?.errors || server?.errors || undefined;
-    return { data: null, message: undefined, error: { message, fields } };
   }
 };
 
@@ -103,7 +136,6 @@ const getVendorProducts = async (
   query: Partial<IProductQuery> = {}
 ): Promise<ApiResult<IProductsListResult>> => {
   try {
-    // Ensure numeric defaults to avoid Joi error from backend
     const params = {
       page: query.page ?? 1,
       limit: query.limit ?? 10,
@@ -114,7 +146,7 @@ const getVendorProducts = async (
       isActive:
         typeof query.isActive === "boolean"
           ? query.isActive
-          : query.isActive ?? undefined,
+          : undefined,
       sortBy: query.sortBy ?? undefined,
       sortOrder: query.sortOrder ?? undefined,
     };
@@ -123,9 +155,15 @@ const getVendorProducts = async (
       params,
       withCredentials: true,
     });
+
     const envelope = res?.data ?? {};
+
+    // 🔐 always prefer decrypted payload
+    const payload =
+      (envelope as any).decrypted ?? envelope.data ?? null;
+
     return {
-      data: envelope.data ?? envelope,
+      data: payload,
       message: envelope.message,
       error: null,
     };
@@ -133,6 +171,7 @@ const getVendorProducts = async (
     const server = err?.response?.data;
     const message =
       server?.message ?? err?.message ?? "Failed to fetch products";
+
     return {
       data: null,
       message: undefined,
@@ -140,6 +179,7 @@ const getVendorProducts = async (
     };
   }
 };
+
 
 // DELETE PRODUCT
 const deleteProduct = async (
@@ -166,7 +206,6 @@ const deleteProduct = async (
   }
 };
 
-// UPDATE PRODUCT
 const updateProduct = async (
   productId: string,
   payload: Partial<IProductCreate>
@@ -177,9 +216,17 @@ const updateProduct = async (
       payload,
       { withCredentials: true }
     );
+
     const envelope = res?.data ?? {};
+
+    // 🔐 CRITICAL FIX
+    const data =
+      (envelope as any).decrypted ??
+      envelope.data ??
+      null;
+
     return {
-      data: envelope.data ?? envelope,
+      data,
       message: envelope.message,
       error: null,
     };
@@ -187,6 +234,7 @@ const updateProduct = async (
     const server = err?.response?.data;
     const message =
       server?.message ?? err?.message ?? "Update failed";
+
     return {
       data: null,
       message: undefined,
@@ -195,15 +243,43 @@ const updateProduct = async (
   }
 };
 
+
+
 async function getProducts(
   query: IProductQuery
 ): Promise<ApiResult<IProductsListResult>> {
-  const res = await api.get("/api/product/", {
-    // adjust base path if your router is mounted differently
-    params: query,
-  });
-  return res.data;
+  try {
+    const res = await api.get("/api/product", {
+      params: query,
+    });
+
+    const envelope = res?.data ?? {};
+
+    // 🔐 ALWAYS prefer decrypted payload if present
+    const payload =
+      (envelope as any).decrypted ?? envelope.data ?? null;
+
+    return {
+      data: payload,
+      message: envelope.message,
+      error: null,
+    };
+  } catch (err: any) {
+    const server = err?.response?.data;
+    const message =
+      server?.message ?? err?.message ?? "Failed to fetch products";
+
+    return {
+      data: null,
+      message: undefined,
+      error: {
+        message,
+        fields: server?.data?.errors || server?.errors,
+      },
+    };
+  }
 }
+
 
 export default {
   createProduct,

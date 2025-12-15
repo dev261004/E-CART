@@ -17,6 +17,11 @@ type Props = {
 export default function RoleProtectedRoute({ role, children }: Props) {
   const user = getUser();
 //console.log("user:",user)
+
+
+if (user === undefined) {
+  return null; // or loading spinner
+}
   // not logged in -> go to login
   if (!user) return <Navigate to="/login" replace />;
 
@@ -24,7 +29,7 @@ export default function RoleProtectedRoute({ role, children }: Props) {
 
   if (!allowed) {
     // not authorized -> redirect to home (or a 403 page)
-    return <Navigate to="/" replace />;
+    return <Navigate to="/unauthorized" replace />;
   }
 
   return children;

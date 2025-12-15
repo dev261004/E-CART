@@ -113,6 +113,14 @@ export default function AdminLayout() {
             {!collapsed && <span>Categories</span>}
           </Link>
 
+   <Link
+            to="/admin/products"
+            className="flex items-center gap-3 px-3 py-2 rounded-lg text-white/90 hover:bg-white/10 transition"
+          >
+            <ListTree size={20} />
+            {!collapsed && <span>Products</span>}
+          </Link>
+          
           <Link
             to="/admin/category/add"
             className="flex items-center gap-3 px-3 py-2 rounded-lg text-white/90 hover:bg-white/10 transition"
@@ -121,19 +129,28 @@ export default function AdminLayout() {
             {!collapsed && <span>Add Category</span>}
           </Link>
 
-<Link
-  to="/admin/categories/status"
-  className="flex items-center gap-3 px-3 py-2 rounded-lg text-white/90 hover:bg-white/10 transition"
->
-  <ListTree size={20} />
-  {!collapsed && <span>Manage Categories</span>}
-</Link>
+          <Link
+            to="/admin/categories/status"
+            className="flex items-center gap-3 px-3 py-2 rounded-lg text-white/90 hover:bg-white/10 transition"
+          >
+            <ListTree size={20} />
+            {!collapsed && <span>Manage Categories</span>}
+          </Link>
+       
           <Link
             to="/admin/change-password"
             className="flex items-center gap-3 px-3 py-2 rounded-lg text-white/90 hover:bg-white/10 transition"
           >
             <KeyRound size={18} />
             {!collapsed && <span>Change Password</span>}
+          </Link>
+
+          <Link
+            to="/admin/update-profile"
+            className="flex items-center gap-3 px-3 py-2 rounded-lg text-white/90 hover:bg-white/10 transition"
+          >
+            <PlusCircle size={18} />
+            {!collapsed && <span>Update Profile</span>}
           </Link>
         </nav>
 

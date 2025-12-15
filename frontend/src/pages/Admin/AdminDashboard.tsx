@@ -60,7 +60,16 @@ export default function AdminDashboard(): JSX.Element {
             {/* You can add other admin cards here (Products, Orders, Users) */}
             <div className="col-span-1 rounded-2xl bg-white shadow p-6">
               <h3 className="text-lg font-semibold">Products</h3>
-              <p className="text-sm text-gray-500 mt-2">Coming soon — manage products here.</p>
+              <p className="text-sm text-gray-500 mt-2">Click below to show the Products.</p>
+
+              <div className="mt-11">
+                <button
+                  onClick={() => navigate("/admin/products")}
+                  className="w-full inline-flex items-center justify-center px-4 py-2 rounded-full bg-indigo-600 text-white hover:bg-indigo-700"
+                >
+                  View Products
+                </button>
+              </div>
             </div>
 
 
